@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.androidApplication)
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.jetbrainsCompose)
+    alias(libs.plugins.composeCompiler)
     alias(libs.plugins.googleServices)
     id("com.google.firebase.crashlytics") version "2.9.9"
     id("com.google.firebase.firebase-perf") version "1.4.2"
@@ -9,10 +10,8 @@ plugins {
 
 kotlin {
     androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
         }
     }
     
@@ -24,7 +23,7 @@ kotlin {
             implementation(libs.compose.foundation)
             implementation(libs.compose.material)
             implementation(libs.compose.material3)
-            implementation("androidx.compose.material:material-icons-extended:1.5.4")
+            implementation("androidx.compose.material:material-icons-extended:1.7.6")
             implementation(libs.androidx.activity.compose)
             implementation(libs.koin.android)
             implementation(libs.koin.compose)
@@ -32,14 +31,13 @@ kotlin {
             // DateTime
             implementation(libs.kotlinx.datetime)
             
-            // Firebase
-            implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-            implementation("com.google.firebase:firebase-analytics-ktx")
-            implementation("com.google.firebase:firebase-auth-ktx")
-            implementation("com.google.firebase:firebase-firestore-ktx")
-            implementation("com.google.firebase:firebase-functions-ktx")
-            implementation("com.google.firebase:firebase-crashlytics-ktx")
-            implementation("com.google.firebase:firebase-perf-ktx")
+            // Firebase - specify versions explicitly for now
+            implementation("com.google.firebase:firebase-analytics-ktx:21.5.0")
+            implementation("com.google.firebase:firebase-auth-ktx:22.3.1")
+            implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
+            implementation("com.google.firebase:firebase-functions-ktx:20.4.0")
+            implementation("com.google.firebase:firebase-crashlytics-ktx:18.6.0")
+            implementation("com.google.firebase:firebase-perf-ktx:20.5.1")
         }
         
         val androidUnitTest by getting {
@@ -83,9 +81,6 @@ android {
     }
     buildFeatures {
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.4"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

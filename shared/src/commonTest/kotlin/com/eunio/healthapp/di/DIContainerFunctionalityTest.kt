@@ -23,7 +23,7 @@ import com.eunio.healthapp.testutil.minimalTestModule
 import com.eunio.healthapp.testutil.MockServices
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
-import org.koin.core.error.NoBeanDefFoundException
+import org.koin.core.error.NoDefinitionFoundException
 import org.koin.test.KoinTest
 import org.koin.test.inject
 import org.koin.test.get
@@ -112,7 +112,7 @@ class DIContainerFunctionalityTest : KoinTest {
     @Test
     fun `Koin container handles missing dependencies gracefully`() {
         // Test that requesting non-existent dependencies throws appropriate exceptions
-        assertFailsWith<NoBeanDefFoundException>("Should throw exception for non-existent dependency") {
+        assertFailsWith<NoDefinitionFoundException>("Should throw exception for non-existent dependency") {
             get<NonExistentService>()
         }
     }

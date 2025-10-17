@@ -1,0 +1,12 @@
+{
+  "": {
+    "dependencies": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/EunioBridgeKit.d",
+    "object": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/EunioBridgeKit.o",
+    "swift-dependencies": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/master.swiftdeps"
+  },
+  "/Users/sestak/Eunio-app/EunioBridgeKit/Sources/EunioBridgeKit/FirebaseBridgeProtocol.swift": {
+    "object": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/FirebaseBridgeProtocol.swift.o",
+    "swiftmodule": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/FirebaseBridgeProtocol~partial.swiftmodule",
+    "swift-dependencies": "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/FirebaseBridgeProtocol.swiftdeps"
+  }
+}

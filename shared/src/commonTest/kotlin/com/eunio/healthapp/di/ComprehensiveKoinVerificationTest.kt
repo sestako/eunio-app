@@ -2,7 +2,7 @@ package com.eunio.healthapp.di
 
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
-import org.koin.core.error.NoBeanDefFoundException
+import org.koin.core.error.NoDefinitionFoundException
 import org.koin.test.KoinTest
 import org.koin.test.inject
 import kotlin.test.AfterTest

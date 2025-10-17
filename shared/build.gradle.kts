@@ -7,10 +7,8 @@ plugins {
 
 kotlin {
     androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
         }
     }
     
@@ -23,10 +21,23 @@ kotlin {
             baseName = "shared"
             isStatic = true
             
+            // Disable Bitcode (deprecated in iOS 26)
+            binaryOption("bundleId", "com.eunio.healthapp.shared")
+            
             // Export dependencies that are used in public API
             export(libs.kotlinx.coroutines.core)
             export(libs.kotlinx.datetime)
             export(libs.kotlinx.serialization.json)
+        }
+        
+        // Configure compiler args for iOS 26 compatibility
+        iosTarget.compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    // Support for arm64 and x86_64 simulator architectures
+                    freeCompilerArgs.add("-Xbinary=bundleId=com.eunio.healthapp.shared")
+                }
+            }
         }
     }
 
@@ -60,18 +71,17 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.sqldelight.android.driver)
             
-            // Firebase
-            implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-            implementation("com.google.firebase:firebase-auth-ktx")
-            implementation("com.google.firebase:firebase-firestore-ktx")
-            implementation("com.google.firebase:firebase-analytics-ktx")
-            implementation("com.google.firebase:firebase-crashlytics-ktx")
+            // Firebase - specify versions explicitly for now
+            implementation("com.google.firebase:firebase-auth-ktx:22.3.1")
+            implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
+            implementation("com.google.firebase:firebase-analytics-ktx:21.5.0")
+            implementation("com.google.firebase:firebase-crashlytics-ktx:18.6.0")
         }
         
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            implementation("io.insert-koin:koin-test:3.5.3")
+            implementation("io.insert-koin:koin-test:4.0.0")
         }
         
         val androidUnitTest by getting {

@@ -1,0 +1,4 @@
+module EunioBridgeKit {
+    header "/Users/sestak/Eunio-app/EunioBridgeKit/.build/arm64-apple-macosx/release/EunioBridgeKit.build/EunioBridgeKit-Swift.h"
+    requires objc
+}
