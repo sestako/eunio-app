@@ -1,6 +1,0 @@
-version: "Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)"
-options: "ae46c64795a76efa6d38ebe2b59a99411691e3ffeeaf05a07bd8e797468a55e3"
-build_start_time: [1760705985, 90657000]
-build_end_time: [1760706022, 888578000]
-inputs:
-  "/Users/sestak/Eunio-app/EunioBridgeKit/Sources/EunioBridgeKit/FirebaseBridgeProtocol.swift": [1760704373, 340152513]
