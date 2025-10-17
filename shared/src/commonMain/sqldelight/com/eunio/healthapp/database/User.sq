@@ -1,0 +1,41 @@
+CREATE TABLE User (
+    id TEXT NOT NULL PRIMARY KEY,
+    email TEXT NOT NULL,
+    name TEXT NOT NULL,
+    onboardingComplete INTEGER NOT NULL DEFAULT 0,
+    primaryGoal TEXT NOT NULL,
+    unitSystem TEXT NOT NULL DEFAULT 'METRIC',
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncStatus TEXT NOT NULL DEFAULT 'SYNCED'
+);
+
+selectAll:
+SELECT * FROM User;
+
+selectById:
+SELECT * FROM User WHERE id = ?;
+
+insert:
+INSERT INTO User(id, email, name, onboardingComplete, primaryGoal, unitSystem, createdAt, updatedAt, syncStatus)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE User SET 
+    email = ?,
+    name = ?,
+    onboardingComplete = ?,
+    primaryGoal = ?,
+    unitSystem = ?,
+    updatedAt = ?,
+    syncStatus = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM User WHERE id = ?;
+
+selectPendingSync:
+SELECT * FROM User WHERE syncStatus = 'PENDING';
+
+updateSyncStatus:
+UPDATE User SET syncStatus = ? WHERE id = ?;

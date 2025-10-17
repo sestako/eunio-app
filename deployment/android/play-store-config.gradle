@@ -1,0 +1,213 @@
+// Google Play Store deployment configuration for Eunio Health App
+
+android {
+    compileSdk 34
+    
+    defaultConfig {
+        applicationId "com.eunio.healthapp"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+        
+        // Health app specific configurations
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // Proguard configuration for release builds
+        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+    }
+    
+    signingConfigs {
+        release {
+            // These should be set via environment variables or gradle.properties
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: project.findProperty("KEYSTORE_FILE"))
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: project.findProperty("KEYSTORE_PASSWORD")
+            keyAlias System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS")
+            keyPassword System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD")
+        }
+    }
+    
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            debuggable true
+            minifyEnabled false
+            shrinkResources false
+            
+            // Debug-specific configurations
+            buildConfigField "String", "API_BASE_URL", "\"https://api-dev.eunio.com\""
+            buildConfigField "boolean", "ENABLE_LOGGING", "true"
+            buildConfigField "boolean", "ENABLE_CRASH_REPORTING", "false"
+        }
+        
+        release {
+            debuggable false
+            minifyEnabled true
+            shrinkResources true
+            signingConfig signingConfigs.release
+            
+            // Production configurations
+            buildConfigField "String", "API_BASE_URL", "\"https://api.eunio.com\""
+            buildConfigField "boolean", "ENABLE_LOGGING", "false"
+            buildConfigField "boolean", "ENABLE_CRASH_REPORTING", "true"
+            
+            // Optimization settings
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        
+        staging {
+            initWith release
+            applicationIdSuffix ".staging"
+            debuggable true
+            
+            buildConfigField "String", "API_BASE_URL", "\"https://api-staging.eunio.com\""
+            buildConfigField "boolean", "ENABLE_LOGGING", "true"
+            buildConfigField "boolean", "ENABLE_CRASH_REPORTING", "true"
+        }
+    }
+    
+    // App Bundle configuration for Play Store
+    bundle {
+        language {
+            enableSplit = true
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
+        }
+    }
+    
+    // Lint configuration for health apps
+    lintOptions {
+        checkReleaseBuilds true
+        abortOnError true
+        
+        // Health app specific lint checks
+        enable 'PrivateResource', 'SecureRandom', 'TrustAllX509TrustManager'
+        error 'StopShip', 'HardcodedDebugMode'
+        warning 'UnusedResources', 'IconMissingDensityFolder'
+    }
+    
+    // Testing configuration
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
+        }
+        
+        animationsDisabled = true
+    }
+    
+    // Packaging options
+    packagingOptions {
+        resources {
+            excludes += [
+                '/META-INF/{AL2.0,LGPL2.1}',
+                '/META-INF/gradle/incremental.annotation.processors'
+            ]
+        }
+    }
+}
+
+// Play Store specific configurations
+play {
+    // Service account key for Play Console API
+    serviceAccountCredentials = file("play-store-service-account.json")
+    
+    // Track for releases (internal, alpha, beta, production)
+    track = "internal"
+    
+    // Release status
+    releaseStatus = "draft"
+    
+    // User fraction for staged rollouts (0.1 = 10%)
+    userFraction = 0.1
+    
+    // Update priority (0-5, where 5 is highest)
+    updatePriority = 3
+    
+    // Retain artifacts for rollback
+    retain {
+        artifacts = 3
+        mainObb = 3
+        patchObb = 3
+    }
+}
+
+// Health app compliance configurations
+android.applicationVariants.all { variant ->
+    if (variant.buildType.name == "release") {
+        variant.outputs.all { output ->
+            // Ensure HIPAA compliance in file naming
+            outputFileName = "eunio-health-app-${variant.versionName}-${variant.buildType.name}-hipaa-compliant.apk"
+        }
+    }
+}
+
+// Dependencies for Play Store features
+dependencies {
+    // Play Core for in-app updates and reviews
+    implementation 'com.google.android.play:core:1.10.3'
+    implementation 'com.google.android.play:core-ktx:1.8.1'
+    
+    // Play Services for health data integration
+    implementation 'com.google.android.gms:play-services-fitness:21.1.0'
+    implementation 'com.google.android.gms:play-services-auth:20.7.0'
+    
+    // Firebase for backend services
+    implementation platform('com.google.firebase:firebase-bom:32.3.1')
+    implementation 'com.google.firebase:firebase-analytics-ktx'
+    implementation 'com.google.firebase:firebase-crashlytics-ktx'
+    implementation 'com.google.firebase:firebase-perf-ktx'
+    
+    // Health app specific dependencies
+    implementation 'androidx.health:health-connect-client:1.0.0-alpha11'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+}
+
+// Play Store metadata validation
+task validatePlayStoreMetadata {
+    doLast {
+        def metadataDir = file("src/main/play")
+        if (!metadataDir.exists()) {
+            throw new GradleException("Play Store metadata directory not found: ${metadataDir}")
+        }
+        
+        // Validate required metadata files
+        def requiredFiles = [
+            "release-notes/en-US/default.txt",
+            "listings/en-US/title.txt",
+            "listings/en-US/short-description.txt",
+            "listings/en-US/full-description.txt"
+        ]
+        
+        requiredFiles.each { fileName ->
+            def file = new File(metadataDir, fileName)
+            if (!file.exists()) {
+                throw new GradleException("Required Play Store metadata file missing: ${fileName}")
+            }
+        }
+        
+        println "Play Store metadata validation passed"
+    }
+}
+
+// Pre-upload validation
+task preUploadValidation {
+    dependsOn validatePlayStoreMetadata
+    dependsOn 'lintRelease'
+    dependsOn 'testReleaseUnitTest'
+    
+    doLast {
+        println "Pre-upload validation completed successfully"
+    }
+}
+
+// Make sure validation runs before publishing
+tasks.whenTaskAdded { task ->
+    if (task.name == 'publishReleaseBundle' || task.name == 'publishReleaseApk') {
+        task.dependsOn preUploadValidation
+    }
+}

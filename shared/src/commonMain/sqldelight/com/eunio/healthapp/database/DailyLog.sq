@@ -1,0 +1,91 @@
+CREATE TABLE DailyLog (
+    id TEXT NOT NULL PRIMARY KEY,
+    userId TEXT NOT NULL,
+    date INTEGER NOT NULL,
+    periodFlow TEXT,
+    symptoms TEXT, -- JSON array
+    mood TEXT,
+    sexualActivity TEXT, -- JSON object
+    bbt REAL,
+    cervicalMucus TEXT,
+    opkResult TEXT,
+    notes TEXT,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL,
+    syncStatus TEXT NOT NULL DEFAULT 'PENDING',
+    isSynced INTEGER NOT NULL DEFAULT 0, -- Boolean: 0 = false, 1 = true
+    pendingSync INTEGER NOT NULL DEFAULT 1, -- Boolean: 0 = false, 1 = true
+    lastSyncAttempt INTEGER, -- Timestamp in epoch seconds, nullable
+    syncRetryCount INTEGER NOT NULL DEFAULT 0 -- Number of retry attempts
+);
+
+selectAll:
+SELECT * FROM DailyLog;
+
+selectById:
+SELECT * FROM DailyLog WHERE id = ?;
+
+selectByUserId:
+SELECT * FROM DailyLog WHERE userId = ? ORDER BY date DESC;
+
+selectByUserIdAndDate:
+SELECT * FROM DailyLog WHERE userId = ? AND date = ?;
+
+selectByUserIdAndDateRange:
+SELECT * FROM DailyLog WHERE userId = ? AND date BETWEEN ? AND ? ORDER BY date ASC;
+
+insert:
+INSERT INTO DailyLog(id, userId, date, periodFlow, symptoms, mood, sexualActivity, bbt, cervicalMucus, opkResult, notes, createdAt, updatedAt, syncStatus, isSynced, pendingSync, lastSyncAttempt, syncRetryCount)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE DailyLog SET 
+    periodFlow = ?,
+    symptoms = ?,
+    mood = ?,
+    sexualActivity = ?,
+    bbt = ?,
+    cervicalMucus = ?,
+    opkResult = ?,
+    notes = ?,
+    updatedAt = ?,
+    syncStatus = ?,
+    isSynced = ?,
+    pendingSync = ?,
+    lastSyncAttempt = ?,
+    syncRetryCount = ?
+WHERE id = ?;
+
+deleteById:
+DELETE FROM DailyLog WHERE id = ?;
+
+selectPendingSync:
+SELECT * FROM DailyLog WHERE syncStatus = 'PENDING' OR pendingSync = 1;
+
+updateSyncStatus:
+UPDATE DailyLog SET syncStatus = ? WHERE id = ?;
+
+markAsSynced:
+UPDATE DailyLog SET 
+    isSynced = 1,
+    pendingSync = 0,
+    syncStatus = 'SYNCED'
+WHERE id = ?;
+
+markAsPendingSync:
+UPDATE DailyLog SET 
+    isSynced = 0,
+    pendingSync = 1,
+    syncStatus = 'PENDING'
+WHERE id = ?;
+
+incrementSyncRetryCount:
+UPDATE DailyLog SET 
+    syncRetryCount = syncRetryCount + 1,
+    lastSyncAttempt = ?
+WHERE id = ?;
+
+resetSyncRetryCount:
+UPDATE DailyLog SET 
+    syncRetryCount = 0
+WHERE id = ?;

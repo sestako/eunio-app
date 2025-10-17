@@ -1,0 +1,54 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# Android
+*.iml
+.idea/
+local.properties
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+output.json
+
+# iOS
+*.xcworkspace
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Kotlin Multiplatform
+shared/build/
+androidApp/build/
+iosApp/build/
+
+# Firebase
+google-services.json
+GoogleService-Info.plist
+
+# SQLDelight
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~

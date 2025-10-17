@@ -1,0 +1,116 @@
+// App Store deployment configuration for Eunio Health App iOS
+
+// MARK: - Basic App Configuration
+PRODUCT_NAME = Eunio Health
+PRODUCT_BUNDLE_IDENTIFIER = com.eunio.healthapp
+MARKETING_VERSION = 1.0.0
+CURRENT_PROJECT_VERSION = 1
+
+// MARK: - Deployment Target
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+
+// MARK: - App Store Connect Configuration
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+CODE_SIGN_STYLE = Manual
+PROVISIONING_PROFILE_SPECIFIER = Eunio Health App Store Distribution
+
+// MARK: - Build Configuration
+SWIFT_VERSION = 5.9
+ENABLE_BITCODE = NO
+SWIFT_COMPILATION_MODE = wholemodule
+SWIFT_OPTIMIZATION_LEVEL = -O
+GCC_OPTIMIZATION_LEVEL = s
+
+// MARK: - Security and Privacy
+ENABLE_HARDENED_RUNTIME = YES
+ENABLE_APP_SANDBOX = NO
+CODE_SIGN_ENTITLEMENTS = EunioHealthApp/EunioHealthApp.entitlements
+
+// MARK: - Health App Specific Entitlements
+HEALTH_KIT_USAGE = YES
+BACKGROUND_MODES = background-fetch background-processing health-kit
+
+// MARK: - App Transport Security
+NSAppTransportSecurity = {
+    NSAllowsArbitraryLoads = NO;
+    NSExceptionDomains = {
+        "firestore.googleapis.com" = {
+            NSExceptionRequiresForwardSecrecy = NO;
+            NSExceptionMinimumTLSVersion = "TLSv1.2";
+            NSIncludesSubdomains = YES;
+        };
+        "firebase.googleapis.com" = {
+            NSExceptionRequiresForwardSecrecy = NO;
+            NSExceptionMinimumTLSVersion = "TLSv1.2";
+            NSIncludesSubdomains = YES;
+        };
+    };
+}
+
+// MARK: - Privacy Manifest Configuration
+PRIVACY_MANIFEST_PATH = EunioHealthApp/PrivacyInfo.xcprivacy
+
+// MARK: - App Store Review Guidelines Compliance
+USES_HEALTH_DATA = YES
+HEALTH_DATA_USAGE_DESCRIPTION = "This app uses HealthKit to sync your health data for comprehensive cycle tracking and insights."
+CAMERA_USAGE_DESCRIPTION = "Camera access is used to scan documents for health reports."
+PHOTO_LIBRARY_USAGE_DESCRIPTION = "Photo library access is used to save and share health reports."
+
+// MARK: - Localization
+LOCALIZATION_PREFERS_STRING_CATALOGS = YES
+DEVELOPMENT_LANGUAGE = en
+LOCALIZED_STRING_MACRO_NAMES = NSLocalizedString CFLocalizedString
+
+// MARK: - Performance Optimization
+ENABLE_PREVIEWS = NO
+ENABLE_TESTING_SEARCH_PATHS = NO
+VALIDATE_PRODUCT = YES
+STRIP_INSTALLED_PRODUCT = YES
+COPY_PHASE_STRIP = YES
+
+// MARK: - App Store Connect API Configuration
+API_KEY_PATH = deployment/ios/AuthKey_XXXXXXXXXX.p8
+API_KEY_ID = XXXXXXXXXX
+API_ISSUER_ID = XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+
+// MARK: - TestFlight Configuration
+TESTFLIGHT_BETA_GROUPS = Internal Testing,External Testing
+TESTFLIGHT_BETA_REVIEW_INFO = "This is a women's health tracking app that helps users monitor their menstrual cycles and fertility indicators."
+
+// MARK: - App Store Metadata
+APP_STORE_CATEGORY = Medical
+APP_STORE_SUBCATEGORY = Health & Fitness
+CONTENT_RATING = 12+
+REQUIRES_HEALTH_KIT = YES
+
+// MARK: - Build Settings for Distribution
+CONFIGURATION = Release
+ONLY_ACTIVE_ARCH = NO
+VALID_ARCHS = arm64
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = arm64
+
+// MARK: - Signing Configuration for Different Environments
+CODE_SIGN_IDENTITY[config=Debug] = iPhone Developer
+CODE_SIGN_IDENTITY[config=Release] = iPhone Distribution
+PROVISIONING_PROFILE_SPECIFIER[config=Debug] = Eunio Health App Development
+PROVISIONING_PROFILE_SPECIFIER[config=Release] = Eunio Health App Store Distribution
+
+// MARK: - Framework Search Paths
+FRAMEWORK_SEARCH_PATHS = $(inherited) $(PROJECT_DIR)/Frameworks
+
+// MARK: - Other Linker Flags
+OTHER_LDFLAGS = $(inherited) -framework HealthKit -framework CryptoKit -framework Security
+
+// MARK: - Preprocessor Macros
+GCC_PREPROCESSOR_DEFINITIONS = $(inherited) HEALTH_APP=1 HIPAA_COMPLIANT=1
+
+// MARK: - Warning Flags
+WARNING_CFLAGS = -Wall -Wextra -Wno-unused-parameter
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+GCC_TREAT_WARNINGS_AS_ERRORS = YES
+
+// MARK: - App Store Connect Automation
+FASTLANE_SKIP_UPDATE_CHECK = 1
+FASTLANE_HIDE_GITHUB_ISSUES = 1
+FASTLANE_DISABLE_ANIMATION = 1

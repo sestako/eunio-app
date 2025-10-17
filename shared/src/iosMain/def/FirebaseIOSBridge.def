@@ -1,0 +1,7 @@
+language = Objective-C
+headers = FirebaseIOSBridge.h
+headerFilter = FirebaseIOSBridge.h
+package = com.eunio.healthapp.firebase.bridge
+
+compilerOpts = -framework Foundation
+linkerOpts = -framework Foundation

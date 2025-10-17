@@ -1,0 +1,162 @@
+-- UserSettings table for comprehensive user preferences
+CREATE TABLE UserSettings (
+    userId TEXT NOT NULL PRIMARY KEY,
+    unitPreferences TEXT NOT NULL, -- JSON serialized UnitPreferences
+    notificationPreferences TEXT NOT NULL, -- JSON serialized NotificationPreferences
+    cyclePreferences TEXT NOT NULL, -- JSON serialized CyclePreferences
+    privacyPreferences TEXT NOT NULL, -- JSON serialized PrivacyPreferences
+    displayPreferences TEXT NOT NULL, -- JSON serialized DisplayPreferences
+    syncPreferences TEXT NOT NULL, -- JSON serialized SyncPreferences
+    lastModified INTEGER NOT NULL,
+    syncStatus TEXT NOT NULL DEFAULT 'PENDING',
+    version INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+);
+
+-- SettingsBackup table for data export functionality
+CREATE TABLE SettingsBackup (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId TEXT NOT NULL,
+    settingsData TEXT NOT NULL, -- JSON serialized complete UserSettings
+    backupType TEXT NOT NULL DEFAULT 'MANUAL', -- MANUAL, AUTOMATIC, EXPORT
+    createdAt INTEGER NOT NULL,
+    dataSize INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+);
+
+-- Performance optimization indexes
+CREATE INDEX idx_user_settings_sync_status ON UserSettings(syncStatus);
+CREATE INDEX idx_user_settings_last_modified ON UserSettings(lastModified DESC);
+CREATE INDEX idx_user_settings_version ON UserSettings(version);
+CREATE INDEX idx_user_settings_composite ON UserSettings(userId, syncStatus, lastModified);
+
+CREATE INDEX idx_settings_backup_user ON SettingsBackup(userId);
+CREATE INDEX idx_settings_backup_created_at ON SettingsBackup(createdAt DESC);
+CREATE INDEX idx_settings_backup_type ON SettingsBackup(backupType);
+CREATE INDEX idx_settings_backup_composite ON SettingsBackup(userId, backupType, createdAt);
+
+-- Basic CRUD operations
+selectAll:
+SELECT * FROM UserSettings;
+
+selectByUserId:
+SELECT * FROM UserSettings WHERE userId = ?;
+
+selectPendingSync:
+SELECT * FROM UserSettings WHERE syncStatus = 'PENDING';
+
+selectFailedSync:
+SELECT * FROM UserSettings WHERE syncStatus = 'FAILED';
+
+insert:
+INSERT INTO UserSettings(
+    userId, 
+    unitPreferences, 
+    notificationPreferences, 
+    cyclePreferences, 
+    privacyPreferences, 
+    displayPreferences, 
+    syncPreferences, 
+    lastModified, 
+    syncStatus, 
+    version
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+update:
+UPDATE UserSettings SET 
+    unitPreferences = ?,
+    notificationPreferences = ?,
+    cyclePreferences = ?,
+    privacyPreferences = ?,
+    displayPreferences = ?,
+    syncPreferences = ?,
+    lastModified = ?,
+    syncStatus = ?,
+    version = ?
+WHERE userId = ?;
+
+updateSyncStatus:
+UPDATE UserSettings SET syncStatus = ?, lastModified = ? WHERE userId = ?;
+
+deleteByUserId:
+DELETE FROM UserSettings WHERE userId = ?;
+
+deleteAll:
+DELETE FROM UserSettings;
+
+-- Performance optimized queries
+selectByUserIdOptimized:
+SELECT * FROM UserSettings 
+WHERE userId = ? 
+ORDER BY lastModified DESC 
+LIMIT 1;
+
+selectRecentlyModified:
+SELECT * FROM UserSettings 
+WHERE lastModified > ? 
+ORDER BY lastModified DESC;
+
+selectPendingSyncBatch:
+SELECT * FROM UserSettings 
+WHERE syncStatus = 'PENDING' 
+ORDER BY lastModified ASC 
+LIMIT ?;
+
+countByStatus:
+SELECT COUNT(*) FROM UserSettings WHERE syncStatus = ?;
+
+countTotal:
+SELECT COUNT(*) FROM UserSettings;
+
+getLastModifiedTimestamp:
+SELECT lastModified FROM UserSettings WHERE userId = ?;
+
+settingsExist:
+SELECT COUNT(*) > 0 FROM UserSettings WHERE userId = ?;
+
+-- Settings backup operations
+insertBackup:
+INSERT INTO SettingsBackup(userId, settingsData, backupType, createdAt, dataSize)
+VALUES (?, ?, ?, ?, ?);
+
+selectBackupById:
+SELECT * FROM SettingsBackup WHERE id = ?;
+
+selectBackupsByUserId:
+SELECT * FROM SettingsBackup WHERE userId = ? ORDER BY createdAt DESC;
+
+selectBackupsByUserIdAndType:
+SELECT * FROM SettingsBackup WHERE userId = ? AND backupType = ? ORDER BY createdAt DESC;
+
+deleteBackupById:
+DELETE FROM SettingsBackup WHERE id = ?;
+
+deleteBackupsByUserId:
+DELETE FROM SettingsBackup WHERE userId = ?;
+
+deleteOldBackups:
+DELETE FROM SettingsBackup WHERE createdAt < ?;
+
+countBackupsByUserId:
+SELECT COUNT(*) FROM SettingsBackup WHERE userId = ?;
+
+getTotalBackupSize:
+SELECT COALESCE(SUM(dataSize), 0) FROM SettingsBackup;
+
+getUserBackupSize:
+SELECT COALESCE(SUM(dataSize), 0) FROM SettingsBackup WHERE userId = ?;
+
+-- Maintenance operations
+
+-- Cleanup operations for maintenance
+cleanupOldBackups:
+DELETE FROM SettingsBackup 
+WHERE userId = ? 
+AND backupType = 'AUTOMATIC' 
+AND id NOT IN (
+    SELECT id FROM SettingsBackup 
+    WHERE userId = ? 
+    AND backupType = 'AUTOMATIC' 
+    ORDER BY createdAt DESC 
+    LIMIT 10
+);

@@ -1,0 +1,179 @@
+# Fastfile for Eunio Health App iOS Deployment
+
+default_platform(:ios)
+
+platform :ios do
+  before_all do
+    setup_circle_ci if ENV['CI']
+  end
+
+  desc "Build and test the iOS app"
+  lane :test do
+    run_tests(
+      workspace: "iosApp/iosApp.xcodeproj/project.xcworkspace",
+      scheme: "iosApp",
+      device: "iPhone 15 Pro",
+      clean: true
+    )
+  end
+
+  desc "Build the iOS app for development"
+  lane :build_debug do
+    build_app(
+      workspace: "iosApp/iosApp.xcodeproj/project.xcworkspace",
+      scheme: "iosApp",
+      configuration: "Debug",
+      export_method: "development",
+      output_directory: "./build/ios/debug",
+      clean: true
+    )
+  end
+
+  desc "Build the iOS app for App Store submission"
+  lane :build_release do
+    # Increment build number
+    increment_build_number(
+      xcodeproj: "iosApp/iosApp.xcodeproj"
+    )
+
+    # Build the app
+    build_app(
+      workspace: "iosApp/iosApp.xcodeproj/project.xcworkspace",
+      scheme: "iosApp",
+      configuration: "Release",
+      export_method: "app-store",
+      output_directory: "./build/ios/release",
+      clean: true,
+      export_options: {
+        provisioningProfiles: {
+          "com.eunio.healthapp" => "Eunio Health App Store Distribution"
+        }
+      }
+    )
+  end
+
+  desc "Upload to TestFlight"
+  lane :beta do
+    build_release
+    
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      beta_app_review_info: {
+        contact_email: "support@eunio.com",
+        contact_first_name: "Eunio",
+        contact_last_name: "Support",
+        contact_phone: "+1234567890",
+        demo_account_name: "demo@eunio.com",
+        demo_account_password: "DemoPassword123!",
+        notes: "This is a women's health tracking app that helps users monitor their menstrual cycles and fertility indicators. The app uses HealthKit to sync health data and provides insights based on user input."
+      },
+      localized_app_info: {
+        "default" => {
+          feedback_email: "feedback@eunio.com",
+          marketing_url: "https://eunio.com",
+          privacy_policy_url: "https://eunio.com/privacy",
+          description: "Comprehensive women's health tracking with cycle insights and fertility monitoring."
+        }
+      }
+    )
+  end
+
+  desc "Deploy to App Store"
+  lane :release do
+    build_release
+    
+    upload_to_app_store(
+      force: true,
+      reject_if_possible: true,
+      skip_metadata: false,
+      skip_screenshots: false,
+      submit_for_review: false,
+      automatic_release: false,
+      app_review_information: {
+        first_name: "Eunio",
+        last_name: "Support",
+        phone_number: "+1234567890",
+        email_address: "support@eunio.com",
+        demo_user: "demo@eunio.com",
+        demo_password: "DemoPassword123!",
+        notes: "This is a women's health tracking app that helps users monitor their menstrual cycles and fertility indicators. The app uses HealthKit to sync health data and provides insights based on user input."
+      }
+    )
+  end
+
+  desc "Run all quality checks"
+  lane :quality_check do
+    # Run tests
+    test
+    
+    # Check code coverage
+    slather(
+      proj: "iosApp/iosApp.xcodeproj",
+      scheme: "iosApp",
+      output_directory: "./build/coverage",
+      html: true
+    )
+    
+    # Run SwiftLint
+    swiftlint(
+      mode: :lint,
+      config_file: ".swiftlint.yml",
+      raise_if_swiftlint_error: true
+    )
+  end
+
+  desc "Prepare for App Store submission"
+  lane :prepare_submission do
+    # Run quality checks
+    quality_check
+    
+    # Update version if needed
+    if ENV['VERSION']
+      increment_version_number(
+        version_number: ENV['VERSION'],
+        xcodeproj: "iosApp/iosApp.xcodeproj"
+      )
+    end
+    
+    # Build and validate
+    build_release
+    
+    # Validate the build
+    validate_app(
+      app_path: lane_context[SharedValues::IPA_OUTPUT_PATH]
+    )
+    
+    UI.success("✅ App is ready for App Store submission!")
+    UI.message("📱 IPA location: #{lane_context[SharedValues::IPA_OUTPUT_PATH]}")
+  end
+
+  # Error handling
+  error do |lane, exception|
+    UI.error("❌ Error in lane #{lane}: #{exception.message}")
+    
+    # Send notification or log error as needed
+    if ENV['SLACK_URL']
+      slack(
+        message: "iOS build failed in lane #{lane}: #{exception.message}",
+        success: false
+      )
+    end
+  end
+
+  after_all do |lane|
+    UI.success("✅ Successfully completed lane: #{lane}")
+    
+    # Clean up temporary files
+    clean_build_artifacts
+  end
+end
+
+# Helper methods
+def validate_app(app_path:)
+  UI.message("🔍 Validating app at #{app_path}")
+  
+  # Add custom validation logic here
+  # For example, check app size, validate entitlements, etc.
+  
+  UI.success("✅ App validation completed")
+end

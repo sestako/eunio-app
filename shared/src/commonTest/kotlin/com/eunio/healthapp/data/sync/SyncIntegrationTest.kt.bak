@@ -1,0 +1,260 @@
+package com.eunio.healthapp.data.sync
+
+import com.eunio.healthapp.data.repository.LogRepositoryImpl
+import com.eunio.healthapp.data.repository.SyncManager
+import com.eunio.healthapp.data.repository.UserRepositoryImpl
+import com.eunio.healthapp.data.sync.AppFeature
+import com.eunio.healthapp.domain.error.AppError
+import com.eunio.healthapp.domain.model.DailyLog
+import com.eunio.healthapp.domain.model.SyncStatus
+import com.eunio.healthapp.domain.model.User
+import com.eunio.healthapp.domain.util.ErrorHandler
+import com.eunio.healthapp.domain.util.NetworkConnectivity
+import com.eunio.healthapp.domain.util.Result
+import com.eunio.healthapp.testutil.EnhancedMockServices
+import com.eunio.healthapp.testutil.TestDataFactory
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
+import kotlin.test.*
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class SyncIntegrationTest {
+    
+    private lateinit var mockUserRepository: UserRepositoryImpl
+    private lateinit var mockLogRepository: LogRepositoryImpl
+    private lateinit var mockNetworkConnectivity: NetworkConnectivity
+    private lateinit var errorHandler: ErrorHandler
+    private lateinit var testScope: TestScope
+    private lateinit var syncManager: SyncManager
+
+    
+    @BeforeTest
+    fun setup() {
+        testScope = TestScope()
+        errorHandler = ErrorHandler()
+        
+        mockUserRepository = EnhancedMockServices.createMockUserRepository()
+        mockLogRepository = EnhancedMockServices.createMockLogRepository()
+        mockNetworkConnectivity = EnhancedMockServices.createMockNetworkConnectivity()
+        
+        syncManager = SyncManager(
+            userRepository = mockUserRepository,
+            logRepository = mockLogRepository,
+            networkConnectivity = mockNetworkConnectivity,
+            errorHandler = errorHandler,
+            coroutineScope = testScope
+        )
+    }
+    
+    @Test
+    fun `offline data logging should work without network`() = runTest {
+        // Arrange
+        // Set network disconnected - handled by mock setup
+        val testLog = TestDataFactory.createTestDailyLog("user1")
+        
+        // Act - Save data while offline
+        val saveResult = mockLogRepository.saveDailyLog(testLog)
+        
+        // Assert
+        assertTrue(saveResult.isSuccess)
+        // Data should be saved locally with PENDING sync status
+        val retrievedLog = mockLogRepository.getDailyLog("user1", testLog.date)
+        assertTrue(retrievedLog.isSuccess)
+        assertNotNull(retrievedLog.getOrNull())
+    }
+    
+    @Test
+    fun `sync should be triggered when network is restored after offline period`() = runTest {
+        // Arrange
+        var syncTriggered = false
+        EnhancedMockServices.setRepositorySyncResultWithCallback(mockUserRepository) {
+            syncTriggered = true
+            Result.Success(Unit)
+        }
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Simulate network restoration
+        EnhancedMockServices.setNetworkConnectivityFlow(
+            mockNetworkConnectivity,
+            flowOf(false, true) // Offline then online
+        )
+        
+        // Act - Wait for connectivity monitoring to trigger sync
+        kotlinx.coroutines.delay(100)
+        
+        // Assert
+        assertTrue(syncTriggered)
+    }
+    
+    @Test
+    fun `pending changes should sync when network becomes available`() = runTest {
+        // Arrange
+        val testUser = TestDataFactory.createTestUser("user1")
+        val testLog = TestDataFactory.createTestDailyLog("user1")
+        
+        // Start offline
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, false)
+        
+        // Save data offline (should be marked as pending)
+        mockUserRepository.updateUser(testUser)
+        mockLogRepository.saveDailyLog(testLog)
+        
+        // Setup sync success
+        EnhancedMockServices.setRepositorySyncResult(mockUserRepository, Result.Success(Unit))
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Act - Restore network and trigger sync
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        val syncResult = syncManager.performFullSync()
+        
+        // Assert
+        assertTrue(syncResult.isSuccess)
+        val statistics = syncResult.getOrThrow()
+        assertTrue(statistics.isOnline)
+    }
+    
+    @Test
+    fun `conflict resolution should work during sync`() = runTest {
+        // Arrange
+        val localUser = TestDataFactory.createTestUser("user1").copy(name = "Local Name")
+        val remoteUser = TestDataFactory.createTestUser("user1").copy(name = "Remote Name")
+        
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        
+        // Simulate conflict during sync
+        EnhancedMockServices.setRepositorySyncResultWithCallback(mockUserRepository) {
+            // This would normally trigger conflict resolution
+            Result.Success(Unit)
+        }
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Act
+        val syncResult = syncManager.performFullSync()
+        
+        // Assert
+        assertTrue(syncResult.isSuccess)
+        // In a real implementation, we would verify conflict resolution occurred
+    }
+    
+    @Test
+    fun `retry logic should work for transient network failures`() = runTest {
+        // Arrange
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        
+        var attemptCount = 0
+        EnhancedMockServices.setRepositorySyncResultWithCallback(mockUserRepository) {
+            attemptCount++
+            if (attemptCount < 3) {
+                Result.Error(AppError.NetworkError("Transient failure"))
+            } else {
+                Result.Success(Unit)
+            }
+        }
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Act
+        val syncResult = syncManager.performSyncWithRetry(maxRetries = 5)
+        
+        // Assert
+        assertTrue(syncResult.isSuccess)
+        assertEquals(3, attemptCount)
+    }
+    
+    @Test
+    fun `offline mode indicators should update correctly`() = runTest {
+        // Arrange - Start online
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        EnhancedMockServices.setNetworkConnectivityFlow(mockNetworkConnectivity, flowOf(true))
+        
+        // Act & Assert - Should be online
+        val onlineStatus = syncManager.syncStatus.first()
+        assertFalse(onlineStatus.isOffline)
+        
+        // Arrange - Go offline
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, false)
+        EnhancedMockServices.setNetworkConnectivityFlow(mockNetworkConnectivity, flowOf(false))
+        
+        // Wait for state update
+        kotlinx.coroutines.delay(10)
+        
+        // Act & Assert - Should be offline
+        val offlineStatus = syncManager.syncStatus.first()
+        assertTrue(offlineStatus.isOffline)
+    }
+    
+    @Test
+    fun `feature availability should be correct in offline mode`() = runTest {
+        // Arrange - Go offline
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, false)
+        EnhancedMockServices.setNetworkConnectivityFlow(mockNetworkConnectivity, flowOf(false))
+        
+        // Wait for state update
+        kotlinx.coroutines.delay(10)
+        
+        // Act & Assert
+        assertTrue(syncManager.isFeatureAvailable(AppFeature.DATA_LOGGING))
+        assertTrue(syncManager.isFeatureAvailable(AppFeature.CALENDAR_VIEW))
+        assertFalse(syncManager.isFeatureAvailable(AppFeature.DATA_SYNC))
+        assertFalse(syncManager.isFeatureAvailable(AppFeature.DATA_EXPORT))
+    }
+    
+    @Test
+    fun `graceful degradation should work for extended offline periods`() = runTest {
+        // Arrange - Extended offline period
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, false)
+        EnhancedMockServices.setNetworkConnectivityFlow(mockNetworkConnectivity, flowOf(false))
+        
+        // Simulate extended offline time by manipulating the offline state
+        // In a real test, we would wait or mock the time
+        
+        // Act
+        val featureAvailability = syncManager.featureAvailability.first()
+        
+        // Assert
+        assertTrue(featureAvailability.showLimitedFunctionalityWarning)
+        assertTrue(featureAvailability.degradedFeatures.isNotEmpty())
+        
+        // Core features should still work
+        assertTrue(syncManager.isFeatureAvailable(AppFeature.DATA_LOGGING))
+        assertTrue(syncManager.isFeatureAvailable(AppFeature.CALENDAR_VIEW))
+    }
+    
+    @Test
+    fun `sync recovery should work after app restart simulation`() = runTest {
+        // Arrange - Simulate app restart with pending changes
+        val testLog = TestDataFactory.createTestDailyLog("user1")
+        
+        // Setup pending sync data
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        EnhancedMockServices.setRepositorySyncResult(mockUserRepository, Result.Success(Unit))
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Act - Perform sync (simulating app restart sync)
+        val syncResult = syncManager.performFullSync()
+        
+        // Assert
+        assertTrue(syncResult.isSuccess)
+        val statistics = syncResult.getOrThrow()
+        assertNotNull(statistics.lastSyncTime)
+    }
+    
+    @Test
+    fun `concurrent sync operations should be handled correctly`() = runTest {
+        // Arrange
+        EnhancedMockServices.setNetworkConnected(mockNetworkConnectivity, true)
+        EnhancedMockServices.setRepositorySyncResult(mockUserRepository, Result.Success(Unit))
+        EnhancedMockServices.setRepositorySyncResult(mockLogRepository, Result.Success(Unit))
+        
+        // Act - Try to start multiple syncs concurrently
+        val sync1 = syncManager.performFullSync()
+        val sync2 = syncManager.performFullSync() // Should fail or wait
+        
+        // Assert
+        assertTrue(sync1.isSuccess)
+        // sync2 should either succeed (if queued) or fail with validation error
+        assertTrue(sync2.isSuccess || sync2.errorOrNull() is AppError.ValidationError)
+    }
+}

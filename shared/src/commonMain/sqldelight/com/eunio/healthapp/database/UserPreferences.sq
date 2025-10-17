@@ -1,0 +1,78 @@
+CREATE TABLE UserPreferences (
+    userId TEXT NOT NULL PRIMARY KEY,
+    unitSystem TEXT NOT NULL DEFAULT 'METRIC',
+    isManuallySet INTEGER NOT NULL DEFAULT 0,
+    lastModified INTEGER NOT NULL,
+    syncStatus TEXT NOT NULL DEFAULT 'PENDING',
+    FOREIGN KEY (userId) REFERENCES User(id) ON DELETE CASCADE
+);
+
+-- Performance optimization indexes
+CREATE INDEX idx_user_preferences_sync_status ON UserPreferences(syncStatus);
+CREATE INDEX idx_user_preferences_last_modified ON UserPreferences(lastModified DESC);
+CREATE INDEX idx_user_preferences_unit_system ON UserPreferences(unitSystem);
+CREATE INDEX idx_user_preferences_composite ON UserPreferences(userId, syncStatus, lastModified);
+
+selectAll:
+SELECT * FROM UserPreferences;
+
+selectByUserId:
+SELECT * FROM UserPreferences WHERE userId = ?;
+
+selectPendingSync:
+SELECT * FROM UserPreferences WHERE syncStatus = 'PENDING';
+
+insert:
+INSERT INTO UserPreferences(userId, unitSystem, isManuallySet, lastModified, syncStatus)
+VALUES (?, ?, ?, ?, ?);
+
+update:
+UPDATE UserPreferences SET 
+    unitSystem = ?,
+    isManuallySet = ?,
+    lastModified = ?,
+    syncStatus = ?
+WHERE userId = ?;
+
+updateSyncStatus:
+UPDATE UserPreferences SET syncStatus = ? WHERE userId = ?;
+
+deleteByUserId:
+DELETE FROM UserPreferences WHERE userId = ?;
+
+deleteAll:
+DELETE FROM UserPreferences;
+
+-- Performance optimized queries
+selectByUserIdOptimized:
+SELECT * FROM UserPreferences 
+WHERE userId = ? 
+ORDER BY lastModified DESC 
+LIMIT 1;
+
+selectRecentlyModified:
+SELECT * FROM UserPreferences 
+WHERE lastModified > ? 
+ORDER BY lastModified DESC;
+
+selectByUnitSystem:
+SELECT * FROM UserPreferences 
+WHERE unitSystem = ? 
+ORDER BY lastModified DESC;
+
+selectPendingSyncBatch:
+SELECT * FROM UserPreferences 
+WHERE syncStatus = 'PENDING' 
+ORDER BY lastModified ASC 
+LIMIT ?;
+
+selectFailedSync:
+SELECT * FROM UserPreferences 
+WHERE syncStatus = 'FAILED' 
+ORDER BY lastModified ASC;
+
+countByStatus:
+SELECT COUNT(*) FROM UserPreferences WHERE syncStatus = ?;
+
+countTotal:
+SELECT COUNT(*) FROM UserPreferences;

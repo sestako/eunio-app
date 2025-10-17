@@ -1,0 +1,141 @@
+package com.eunio.healthapp.data.sync
+
+import com.eunio.healthapp.domain.model.*
+import com.eunio.healthapp.domain.util.NetworkConnectivity
+import com.eunio.healthapp.testutil.TestDataFactory
+import com.eunio.healthapp.testutil.MockServices
+import io.mockk.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlin.test.Test
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+import kotlin.test.assertEquals
+
+class BackgroundSyncServiceTest {
+
+    private val mockServices = MockServices()
+    private val testDataFactory = TestDataFactory()
+    private val mockNetworkConnectivity = mockk<NetworkConnectivity>()
+
+    private val backgroundSyncService = BackgroundSyncService(
+        userRepository = mockServices.userRepository,
+        logRepository = mockServices.logRepository,
+        networkConnectivity = mockNetworkConnectivity
+    )
+
+    @Test
+    fun `performFullSync should succeed when network is available and repositories sync successfully`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns true
+        coEvery { mockServices.userRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+        coEvery { mockServices.logRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+
+        // Act
+        val result = backgroundSyncService.performFullSync()
+
+        // Assert
+        assertTrue(result.isSuccess, "Background sync should succeed when network is available")
+        coVerify { mockServices.userRepository.syncPendingChanges() }
+        coVerify { mockServices.logRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `performFullSync should fail when network is not available`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns false
+
+        // Act
+        val result = backgroundSyncService.performSync()
+
+        // Assert
+        assertTrue(result.isFailure, "Background sync should fail when network is not available")
+        coVerify(exactly = 0) { mockServices.userRepository.syncPendingChanges() }
+        coVerify(exactly = 0) { mockServices.logRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `performFullSync should fail when user repository sync fails`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns true
+        coEvery { mockServices.userRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.error(com.eunio.healthapp.domain.error.AppError.NetworkError("User sync failed"))
+        coEvery { mockServices.logRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+
+        // Act
+        val result = backgroundSyncService.performSync()
+
+        // Assert
+        assertTrue(result.isFailure, "Background sync should fail when user repository sync fails")
+        coVerify { mockServices.userRepository.syncPendingChanges() }
+        coVerify(exactly = 0) { mockServices.logRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `performSyncWithRetry should retry on failure and eventually succeed`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns true
+        coEvery { mockServices.userRepository.syncPendingChanges() } returnsMany listOf(
+            com.eunio.healthapp.domain.util.Result.failure(Exception("First attempt failed")),
+            com.eunio.healthapp.domain.util.Result.failure(Exception("Second attempt failed")),
+            com.eunio.healthapp.domain.util.Result.success(Unit)
+        )
+        coEvery { mockServices.logRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+
+        // Act
+        val result = backgroundSyncService.performSyncWithRetry(maxRetries = 3)
+
+        // Assert
+        assertTrue(result.isSuccess, "Sync with retry should eventually succeed")
+        coVerify(exactly = 3) { mockServices.userRepository.syncPendingChanges() }
+        coVerify(exactly = 1) { mockServices.logRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `performSyncWithRetry should fail after max retries`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns true
+        coEvery { mockServices.userRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.failure(Exception("Sync always fails"))
+        coEvery { mockServices.logRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+
+        // Act
+        val result = backgroundSyncService.performSyncWithRetry(maxRetries = 2)
+
+        // Assert
+        assertTrue(result.isFailure, "Sync with retry should fail after max retries")
+        coVerify(exactly = 2) { mockServices.userRepository.syncPendingChanges() }
+        coVerify(exactly = 0) { mockServices.logRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `sync should be triggered when network connectivity is restored`() = runTest {
+        // Arrange
+        every { mockNetworkConnectivity.isConnected() } returns true
+        coEvery { mockServices.userRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+        coEvery { mockServices.logRepository.syncPendingChanges() } returns com.eunio.healthapp.domain.util.Result.success(Unit)
+
+        // Act
+        val result = backgroundSyncService.performSync()
+
+        // Assert
+        assertTrue(result.isSuccess, "Sync should succeed when network is available")
+        coVerify(atLeast = 1) { mockServices.userRepository.syncPendingChanges() }
+    }
+
+    @Test
+    fun `getSyncStatus should return correct status information`() = runTest {
+        // Act
+        val status = backgroundSyncService.getSyncStatus()
+
+        // Assert
+        assertEquals(false, status.isInProgress, "Sync should not be in progress initially")
+        assertEquals(false, status.hasErrors, "Should not have errors initially")
+    }
+
+    @Test
+    fun `stop should not throw exceptions`() = runTest {
+        // Act & Assert - should not throw
+        backgroundSyncService.stop()
+        assertTrue(true, "Stop method should complete without errors")
+    }
+}
