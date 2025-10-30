@@ -1,0 +1,5 @@
+framework module EunioBridgeKit {
+    umbrella header "EunioBridgeKit.h"
+    export *
+    module * { export * }
+}
