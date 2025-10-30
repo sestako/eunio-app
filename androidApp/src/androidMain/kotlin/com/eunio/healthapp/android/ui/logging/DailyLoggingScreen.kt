@@ -53,9 +53,9 @@ import org.koin.compose.koinInject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun DailyLoggingScreen(
+fun DailyLoggingScreen(
     modifier: Modifier = Modifier,
-    onNavigateBack: () -> Unit = {},
+    onNavigateBack: (() -> Unit)? = null,
     viewModel: DailyLoggingViewModel = koinInject()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -116,24 +116,29 @@ internal fun DailyLoggingScreen(
                         ) 
                     },
                     navigationIcon = {
-                        IconButton(
-                            onClick = onNavigateBack,
-                            modifier = Modifier
-                                .minimumTouchTarget()
-                                .semantics {
-                                    contentDescription = "Navigate back to previous screen"
-                                }
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowBack, 
-                                contentDescription = null // Description is on the button
-                            )
+                        onNavigateBack?.let { callback ->
+                            IconButton(
+                                onClick = callback,
+                                modifier = Modifier
+                                    .minimumTouchTarget()
+                                    .semantics {
+                                        contentDescription = "Navigate back to previous screen"
+                                    }
+                            ) {
+                                Icon(
+                                    Icons.Default.ArrowBack, 
+                                    contentDescription = null // Description is on the button
+                                )
+                            }
                         }
                     },
                     actions = {
                         // Always show Save button
                         TextButton(
-                            onClick = viewModel::saveLog,
+                            onClick = {
+                                android.util.Log.d("DailyLoggingScreen", "🔴 SAVE BUTTON CLICKED!")
+                                viewModel.saveLog()
+                            },
                             enabled = !uiState.isSaving,
                             modifier = Modifier
                                 .minimumTouchTarget()
@@ -168,6 +173,9 @@ internal fun DailyLoggingScreen(
                     .fillMaxSize()
                     .padding(paddingValues)
             ) {
+                // Offline banner
+                OfflineBanner()
+                
                 // Date picker section
                 AccessibleDateNavigationSection(
                     selectedDate = uiState.selectedDate.toString(),
@@ -189,40 +197,23 @@ internal fun DailyLoggingScreen(
                 
                 Divider()
                 
-                // Main form content
-                if (uiState.isLoading) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .semantics {
-                                contentDescription = "Loading your daily log data"
-                                liveRegion = LiveRegionMode.Polite
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.semantics {
-                                contentDescription = "Loading daily log data, please wait"
-                            }
-                        )
-                    }
-                } else {
-                    AccessibleDailyLogForm(
-                        uiState = uiState,
-                        onPeriodFlowChanged = viewModel::updatePeriodFlow,
-                        onSymptomToggled = viewModel::toggleSymptom,
-                        onMoodChanged = viewModel::updateMood,
-                        onSexualActivityChanged = viewModel::updateSexualActivity,
-                        onBBTChanged = viewModel::updateBBT,
-                        onCervicalMucusChanged = viewModel::updateCervicalMucus,
-                        onOPKResultChanged = viewModel::updateOPKResult,
-                        onNotesChanged = viewModel::updateNotes,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(16.dp)
-                    )
-                }
+                // Main form content - show form immediately, even while loading
+                // This prevents the second loading screen
+                AccessibleDailyLogForm(
+                    uiState = uiState,
+                    onPeriodFlowChanged = viewModel::updatePeriodFlow,
+                    onSymptomToggled = viewModel::toggleSymptom,
+                    onMoodChanged = viewModel::updateMood,
+                    onSexualActivityChanged = viewModel::updateSexualActivity,
+                    onBBTChanged = viewModel::updateBBT,
+                    onCervicalMucusChanged = viewModel::updateCervicalMucus,
+                    onOPKResultChanged = viewModel::updateOPKResult,
+                    onNotesChanged = viewModel::updateNotes,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(16.dp)
+                )
                 
                 // Error/Success messages with proper accessibility
                 uiState.errorMessage?.let { error ->

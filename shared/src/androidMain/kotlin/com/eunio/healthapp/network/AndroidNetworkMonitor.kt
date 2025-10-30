@@ -35,7 +35,11 @@ class AndroidNetworkMonitor(
         
         override fun onLost(network: Network) {
             Log.d(TAG, "Network lost")
-            _isConnected.value = false
+            // Don't immediately mark as offline - check if there's still an active network
+            // This handles network switching (e.g., WiFi -> Mobile) gracefully
+            val stillConnected = checkInitialConnection()
+            Log.d(TAG, "Network lost, but still connected: $stillConnected")
+            _isConnected.value = stillConnected
         }
         
         override fun onCapabilitiesChanged(
@@ -78,8 +82,9 @@ class AndroidNetworkMonitor(
         val network = connectivityManager.activeNetwork ?: return false
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
         
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        // Only check for internet capability, not validation
+        // This matches the behavior in onCapabilitiesChanged
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
     }
     
     companion object {

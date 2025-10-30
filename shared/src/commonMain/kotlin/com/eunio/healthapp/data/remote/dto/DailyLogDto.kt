@@ -14,13 +14,15 @@ import kotlinx.serialization.Serializable
  * - dateEpochDays: Date stored as UTC epoch days (Long)
  * - createdAt/updatedAt: Timestamps stored as epoch seconds (Long)
  * - v: Schema version field for future migrations
+ * 
+ * Note: All parameters have default values to support Firebase Android's no-arg constructor requirement.
  */
 @Serializable
 data class DailyLogDto(
-    val logId: String,                    // yyyy-MM-dd in UTC
-    val dateEpochDays: Long,              // UTC epoch days
-    val createdAt: Long,                  // Epoch seconds
-    val updatedAt: Long,                  // Epoch seconds
+    val logId: String = "",               // yyyy-MM-dd in UTC
+    val dateEpochDays: Long = 0L,         // UTC epoch days
+    val createdAt: Long = 0L,             // Epoch seconds
+    val updatedAt: Long = 0L,             // Epoch seconds
     val periodFlow: String? = null,       // Enum name or null
     val symptoms: List<String>? = null,   // List of enum names or null
     val mood: String? = null,             // Enum name or null
@@ -80,7 +82,7 @@ data class DailyLogDto(
 
 @Serializable
 data class SexualActivityDto(
-    val occurred: Boolean,
+    val occurred: Boolean = false,
     val protection: String? = null
 ) {
     companion object {

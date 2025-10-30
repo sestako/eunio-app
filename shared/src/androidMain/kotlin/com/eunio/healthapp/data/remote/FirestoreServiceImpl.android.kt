@@ -8,7 +8,10 @@ import com.eunio.healthapp.domain.util.Result
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.WriteBatch
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.datetime.LocalDate
 import kotlinx.serialization.json.Json
 
@@ -218,9 +221,11 @@ class FirestoreServiceImpl(
     }
     
     override suspend fun getDailyLogByDate(userId: String, date: LocalDate): Result<DailyLog?> {
-        return Result.catching(errorHandler) {
-            val epochDays = date.toEpochDays().toLong()
-            val collectionPath = FirestorePaths.dailyLogsCollection(userId)
+        val epochDays = date.toEpochDays().toLong()
+        val collectionPath = FirestorePaths.dailyLogsCollection(userId)
+        android.util.Log.d("FirestoreService.Android", "GET_DAILY_LOG_BY_DATE_START - userId: $userId, date: $date, dateEpochDays: $epochDays, path: $collectionPath")
+        
+        return try {
             val pathParts = collectionPath.split("/")
             
             val querySnapshot = firestore.collection(pathParts[0])
@@ -235,10 +240,16 @@ class FirestoreServiceImpl(
                 val document = querySnapshot.documents.first()
                 val logDto = document.toObject(DailyLogDto::class.java)
                     ?: throw IllegalStateException("Failed to deserialize daily log document")
-                logDto.toDomain(document.id, userId)
+                val dailyLog = logDto.toDomain(document.id, userId)
+                android.util.Log.d("FirestoreService.Android", "GET_DAILY_LOG_BY_DATE_SUCCESS - userId: $userId, logId: ${dailyLog.id}, dateEpochDays: $epochDays")
+                Result.success(dailyLog)
             } else {
-                null
+                android.util.Log.d("FirestoreService.Android", "GET_DAILY_LOG_BY_DATE_NOT_FOUND - userId: $userId, dateEpochDays: $epochDays")
+                Result.success(null)
             }
+        } catch (e: Exception) {
+            android.util.Log.e("FirestoreService.Android", "GET_DAILY_LOG_BY_DATE_ERROR - userId: $userId, dateEpochDays: $epochDays, error: ${e.message}", e)
+            Result.error(errorHandler.handleError(e))
         }
     }
     
@@ -284,17 +295,58 @@ class FirestoreServiceImpl(
     }
     
     override suspend fun saveDailyLog(dailyLog: DailyLog): Result<Unit> {
-        return Result.catching(errorHandler) {
+        val path = FirestorePaths.dailyLogDoc(dailyLog.userId, dailyLog.id)
+        android.util.Log.d("FirestoreService.Android", "SAVE_DAILY_LOG_START - userId: ${dailyLog.userId}, logId: ${dailyLog.id}, path: $path, dateEpochDays: ${dailyLog.date.toEpochDays()}")
+        
+        return try {
             val logDto = DailyLogDto.fromDomain(dailyLog)
-            val path = FirestorePaths.dailyLogDoc(dailyLog.userId, dailyLog.id)
             val pathParts = path.split("/")
             
-            firestore.collection(pathParts[0])
-                .document(pathParts[1])
-                .collection(pathParts[2])
-                .document(pathParts[3])
-                .set(logDto)
-                .await()
+            android.util.Log.d("FirestoreService.Android", "SAVE_DAILY_LOG_DTO - logId: ${logDto.logId}, dateEpochDays: ${logDto.dateEpochDays}, createdAt: ${logDto.createdAt}, updatedAt: ${logDto.updatedAt}")
+            
+            // Convert DTO to Map for Firebase (Firebase doesn't work well with Kotlin data classes directly)
+            val data = hashMapOf<String, Any?>(
+                "logId" to logDto.logId,
+                "dateEpochDays" to logDto.dateEpochDays,
+                "createdAt" to logDto.createdAt,
+                "updatedAt" to logDto.updatedAt,
+                "v" to logDto.v
+            )
+            
+            // Add optional fields only if not null
+            logDto.periodFlow?.let { data["periodFlow"] = it }
+            logDto.symptoms?.let { data["symptoms"] = it }
+            logDto.mood?.let { data["mood"] = it }
+            logDto.bbt?.let { data["bbt"] = it }
+            logDto.cervicalMucus?.let { data["cervicalMucus"] = it }
+            logDto.opkResult?.let { data["opkResult"] = it }
+            logDto.notes?.let { data["notes"] = it }
+            logDto.sexualActivity?.let { 
+                data["sexualActivity"] = hashMapOf<String, Any?>(
+                    "occurred" to it.occurred,
+                    "protection" to it.protection
+                )
+            }
+            
+            android.util.Log.d("FirestoreService.Android", "🔵 About to call firestore.set() with Map - path: ${pathParts.joinToString("/")}")
+            
+            // Try using Dispatchers.IO to ensure we're not blocking the main thread
+            withContext(kotlinx.coroutines.Dispatchers.IO) {
+                withTimeout(10000) { // 10 second timeout
+                    firestore.collection(pathParts[0])
+                        .document(pathParts[1])
+                        .collection(pathParts[2])
+                        .document(pathParts[3])
+                        .set(data)
+                        .await()
+                }
+            }
+            
+            android.util.Log.d("FirestoreService.Android", "SAVE_DAILY_LOG_SUCCESS - userId: ${dailyLog.userId}, logId: ${dailyLog.id}, updatedAt: ${dailyLog.updatedAt.epochSeconds}")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            android.util.Log.e("FirestoreService.Android", "SAVE_DAILY_LOG_ERROR - userId: ${dailyLog.userId}, logId: ${dailyLog.id}, error: ${e.message}", e)
+            Result.error(errorHandler.handleError(e))
         }
     }
     

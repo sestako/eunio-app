@@ -68,6 +68,12 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
     
+    // Sync test collection (for debugging) - allow authenticated users
+    // TODO: Remove this in production
+    match /sync_test/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    
     // Deny all other access by default
     match /{document=**} {
       allow read, write: if false;

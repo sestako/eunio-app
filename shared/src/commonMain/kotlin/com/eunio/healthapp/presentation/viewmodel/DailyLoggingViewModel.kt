@@ -4,6 +4,7 @@ import com.eunio.healthapp.domain.model.*
 import com.eunio.healthapp.domain.usecase.logging.GetDailyLogUseCase
 import com.eunio.healthapp.domain.usecase.logging.SaveDailyLogUseCase
 import com.eunio.healthapp.presentation.state.DailyLoggingUiState
+import com.eunio.healthapp.presentation.util.logDebug
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -40,9 +41,19 @@ class DailyLoggingViewModel(
     fun selectDate(date: LocalDate) {
         if (date == uiState.value.selectedDate) return
         
+        // Clear all form fields when changing dates to prevent showing stale data
         updateState { 
             it.copy(
                 selectedDate = date,
+                currentLog = null,
+                periodFlow = null,
+                selectedSymptoms = emptySet(),
+                mood = null,
+                sexualActivity = null,
+                bbt = "",
+                cervicalMucus = null,
+                opkResult = null,
+                notes = "",
                 hasUnsavedChanges = false,
                 errorMessage = null,
                 successMessage = null
@@ -228,25 +239,35 @@ class DailyLoggingViewModel(
      * Saves the current log.
      */
     fun saveLog() {
+        logDebug("DailyLoggingVM", "🔵 saveLog() CALLED")
         val state = uiState.value
         val selectedDate = state.selectedDate
         
+        logDebug("DailyLoggingVM", "🔵 selectedDate: $selectedDate")
         if (selectedDate == null) {
+            logDebug("DailyLoggingVM", "❌ No date selected")
             updateState { it.copy(errorMessage = "No date selected") }
             return
         }
         
+        logDebug("DailyLoggingVM", "🔵 isBbtValid: ${state.isBbtValid}, bbt: ${state.bbt}")
         if (!state.isBbtValid) {
+            logDebug("DailyLoggingVM", "❌ BBT invalid")
             updateState { it.copy(errorMessage = "BBT must be between 95.0 and 105.0°F") }
             return
         }
         
+        logDebug("DailyLoggingVM", "🔵 Launching coroutine...")
         viewModelScope.launch {
+            logDebug("DailyLoggingVM", "🔵 Inside coroutine")
             // Get current user ID
+            logDebug("DailyLoggingVM", "🔵 Getting current user...")
             val currentUser = authManager.getCurrentUser().getOrNull()
             val userId = currentUser?.id
+            logDebug("DailyLoggingVM", "🔵 userId: $userId")
             
             if (userId == null) {
+                logDebug("DailyLoggingVM", "❌ No user ID - not authenticated")
                 updateState { 
                     it.copy(
                         isSaving = false,
@@ -256,6 +277,7 @@ class DailyLoggingViewModel(
                 return@launch
             }
             
+            logDebug("DailyLoggingVM", "🔵 Setting isSaving = true")
             updateState { it.copy(isSaving = true, errorMessage = null) }
             
             val bbtValue = state.bbt.toDoubleOrNull()

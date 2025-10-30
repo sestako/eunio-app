@@ -53,7 +53,8 @@ val repositoryModule = module {
         LogRepositoryImpl(
             firestoreService = get(),
             dailyLogDao = get(),
-            errorHandler = get()
+            errorHandler = get(),
+            networkConnectivity = get()
         )
     }
     

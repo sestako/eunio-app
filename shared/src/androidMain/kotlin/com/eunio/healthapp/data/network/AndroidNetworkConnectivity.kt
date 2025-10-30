@@ -34,8 +34,10 @@ class AndroidNetworkConnectivity(
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val network = connectivityManager.activeNetwork
             val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
-            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            // Check for internet capability only, not validation
+            // Validation can be slow or fail on emulators/certain networks
+            // We'll rely on the actual Firebase call to determine if we can reach the server
+            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
         } else {
             @Suppress("DEPRECATION")
             val networkInfo = connectivityManager.activeNetworkInfo
@@ -55,8 +57,9 @@ class AndroidNetworkConnectivity(
             }
             
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                // Check for internet capability only, not validation
+                // This ensures the offline banner updates correctly
+                val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 trySend(hasInternet)
             }
         }

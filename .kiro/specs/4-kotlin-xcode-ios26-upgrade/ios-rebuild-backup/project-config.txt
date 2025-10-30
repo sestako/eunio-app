@@ -1,0 +1,37 @@
+iOS Project Configuration
+==========================
+
+Bundle Identifier: com.eunio.healthapp
+Reversed Client ID: com.googleusercontent.apps.458394672643-jhfu0g7fm77ok3epbhc5e1e48loqivoo
+Deployment Target: iOS 15.0
+Swift Files: 139
+
+Capabilities Required:
+- HealthKit
+- HealthKit Background Delivery
+- Keychain Sharing
+- App Groups: group.com.eunio.healthapp
+- Push Notifications
+- Background Modes:
+  - Background fetch
+  - Background processing
+  - HealthKit
+  - Remote notifications
+  - Processing
+
+Firebase Products (SPM):
+- FirebaseAuth
+- FirebaseCore
+- FirebaseFirestore
+- FirebaseCrashlytics
+- FirebaseAnalytics
+- FirebasePerformance
+
+Frameworks to Link:
+- shared.framework (from Kotlin)
+- EunioBridgeKit.xcframework
+
+Build Settings:
+- Enable Bitcode: No
+- Other Linker Flags: -ObjC -l"c++"
+- Enable Modules: Yes

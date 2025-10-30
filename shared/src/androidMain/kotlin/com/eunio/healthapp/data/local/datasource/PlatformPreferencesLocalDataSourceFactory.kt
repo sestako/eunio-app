@@ -7,9 +7,9 @@ import com.eunio.healthapp.data.local.DatabaseManager
  * Android implementation of PreferencesLocalDataSourceFactory.
  * Creates AndroidPreferencesLocalDataSource with SharedPreferences caching.
  */
-actual class PlatformPreferencesLocalDataSourceFactory : PreferencesLocalDataSourceFactory {
+actual class PlatformPreferencesLocalDataSourceFactory actual constructor() : PreferencesLocalDataSourceFactory {
     
-    override fun create(databaseManager: DatabaseManager): PreferencesLocalDataSource {
+    actual override fun create(databaseManager: DatabaseManager): PreferencesLocalDataSource {
         // For Android, we'll fallback to the standard implementation if no context is available
         // In a real app, the context would be injected through the DI system
         return PreferencesLocalDataSourceImpl(databaseManager)

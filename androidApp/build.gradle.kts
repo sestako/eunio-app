@@ -28,6 +28,9 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.koin.compose)
             
+            // Navigation
+            implementation("androidx.navigation:navigation-compose:2.8.5")
+            
             // DateTime
             implementation(libs.kotlinx.datetime)
             
@@ -78,7 +81,26 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro"
+        )
     }
+    
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        debug {
+            isMinifyEnabled = false
+        }
+    }
+    
     buildFeatures {
         compose = true
     }
