@@ -12,16 +12,9 @@ kotlin {
         }
     }
     
-    // TODO: Re-enable iOS targets after fixing EunioBridgeKit framework availability in CI
-    // The iOS targets are temporarily disabled to unblock CI builds while we resolve
-    // the cinterop framework dependency issue. The code is ready, but the framework
-    // needs to be properly packaged or the CI needs to build it first.
-    // See: fix/ios-bridge-native branch for the proper implementation
-    
     // Set iOS deployment target to 15.0 (maintains backward compatibility)
-    // val iosDeploymentTarget = "15.0"
+    val iosDeploymentTarget = "15.0"
     
-    /*
     listOf(
         iosX64(),
         iosArm64(),
@@ -88,7 +81,6 @@ kotlin {
             }
         }
     }
-    */
 
     sourceSets {
         commonMain.dependencies {
@@ -143,13 +135,10 @@ kotlin {
             }
         }
         
-        // TODO: Re-enable when iOS targets are re-enabled
-        /*
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
             implementation(libs.sqldelight.native.driver)
         }
-        */
         
 
     }
