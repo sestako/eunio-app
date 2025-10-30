@@ -21,7 +21,7 @@ fun OnboardingFlow() {
     
     when {
         showMainApp -> {
-            MainScreen(
+            com.eunio.healthapp.android.ui.main.MainAppScreen(
                 onSignOut = {
                     auth.signOut()
                     isAuthenticated = false

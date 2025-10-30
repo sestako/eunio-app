@@ -1,3 +1,4 @@
 language = Objective-C
-headers = FirebaseBridgeWrapper.h
-compilerOpts = -framework Foundation
+headers = FirebaseIOSBridge.h
+headerFilter = FirebaseIOSBridge.h
+compilerOpts = -framework Foundation -F../iosApp/build/Release-iphoneos

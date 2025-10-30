@@ -7,12 +7,13 @@ plugins {
 
 kotlin {
     androidTarget {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
         }
     }
+    
+    // Set iOS deployment target to 15.0 (maintains backward compatibility)
+    val iosDeploymentTarget = "15.0"
     
     listOf(
         iosX64(),
@@ -20,13 +21,64 @@ kotlin {
         iosSimulatorArm64()
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
-            baseName = "shared"
-            isStatic = true
+            baseName = "Shared"
+            isStatic = false  // Dynamic framework required for iOS 26 simulator
+            
+            // Disable Bitcode (deprecated in iOS 26)
+            binaryOption("bundleId", "com.eunio.healthapp.shared")
             
             // Export dependencies that are used in public API
             export(libs.kotlinx.coroutines.core)
             export(libs.kotlinx.datetime)
             export(libs.kotlinx.serialization.json)
+        }
+        
+        // Configure cinterop for EunioBridgeKit framework
+        iosTarget.compilations.getByName("main") {
+            cinterops {
+                val EunioBridgeKit by creating {
+                    definitionFile = project.file("src/iosMain/c_interop/EunioBridgeKit.def")
+                    packageName = "com.eunio.healthapp.bridge"
+                    
+                    val frameworkPath = project.file("src/iosMain/c_interop/libs/EunioBridgeKit.xcframework")
+                    val iosArch = when (iosTarget.name) {
+                        "iosArm64" -> "ios-arm64"
+                        "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+                        else -> "ios-arm64"
+                    }
+                    val frameworkDir = frameworkPath.resolve(iosArch)
+                    
+                    // Add compiler and linker options for the framework
+                    compilerOpts("-framework", "EunioBridgeKit", "-F${frameworkDir}")
+                    extraOpts("-compiler-option", "-F${frameworkDir}")
+                }
+            }
+        }
+        
+        // Add linker options for EunioBridgeKit framework (outside compilation block)
+        val frameworkPath = project.file("src/iosMain/c_interop/libs/EunioBridgeKit.xcframework")
+        val iosArch = when (iosTarget.name) {
+            "iosArm64" -> "ios-arm64"
+            "iosX64", "iosSimulatorArm64" -> "ios-arm64_x86_64-simulator"
+            else -> "ios-arm64"
+        }
+        val frameworkDir = frameworkPath.resolve(iosArch)
+        iosTarget.binaries.all {
+            linkerOpts("-F${frameworkDir}", "-framework", "EunioBridgeKit")
+        }
+        
+        // Configure compiler args for iOS 26 compatibility and deployment target
+        iosTarget.compilations.all {
+            compileTaskProvider.configure {
+                compilerOptions {
+                    // Support for arm64 and x86_64 simulator architectures
+                    freeCompilerArgs.add("-Xbinary=bundleId=com.eunio.healthapp.shared")
+                    // Set deployment target to 15.0 for backward compatibility
+                    freeCompilerArgs.add("-Xoverride-konan-properties=osVersionMin.ios_arm64=$iosDeploymentTarget")
+                    freeCompilerArgs.add("-Xoverride-konan-properties=osVersionMin.ios_x64=$iosDeploymentTarget")
+                    freeCompilerArgs.add("-Xoverride-konan-properties=osVersionMin.ios_simulator_arm64=$iosDeploymentTarget")
+                }
+            }
         }
     }
 
@@ -60,18 +112,17 @@ kotlin {
             implementation(libs.koin.android)
             implementation(libs.sqldelight.android.driver)
             
-            // Firebase
-            implementation(platform("com.google.firebase:firebase-bom:32.7.0"))
-            implementation("com.google.firebase:firebase-auth-ktx")
-            implementation("com.google.firebase:firebase-firestore-ktx")
-            implementation("com.google.firebase:firebase-analytics-ktx")
-            implementation("com.google.firebase:firebase-crashlytics-ktx")
+            // Firebase - specify versions explicitly for now
+            implementation("com.google.firebase:firebase-auth-ktx:22.3.1")
+            implementation("com.google.firebase:firebase-firestore-ktx:24.10.0")
+            implementation("com.google.firebase:firebase-analytics-ktx:21.5.0")
+            implementation("com.google.firebase:firebase-crashlytics-ktx:18.6.0")
         }
         
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
-            implementation("io.insert-koin:koin-test:3.5.3")
+            implementation("io.insert-koin:koin-test:4.0.0")
         }
         
         val androidUnitTest by getting {
@@ -117,4 +168,9 @@ sqldelight {
             packageName.set("com.eunio.healthapp.database")
         }
     }
+}
+
+// Disable sandbox check for Xcode integration
+tasks.matching { it.name == "checkSandboxAndWriteProtection" }.configureEach {
+    enabled = false
 }

@@ -6,9 +6,9 @@ import com.eunio.healthapp.data.local.DatabaseManager
  * iOS implementation of PreferencesLocalDataSourceFactory.
  * Creates IOSPreferencesLocalDataSource with NSUserDefaults caching.
  */
-actual class PlatformPreferencesLocalDataSourceFactory : PreferencesLocalDataSourceFactory {
+actual class PlatformPreferencesLocalDataSourceFactory actual constructor() : PreferencesLocalDataSourceFactory {
     
-    override fun create(databaseManager: DatabaseManager): PreferencesLocalDataSource {
+    actual override fun create(databaseManager: DatabaseManager): PreferencesLocalDataSource {
         return IOSPreferencesLocalDataSource(databaseManager)
     }
 }

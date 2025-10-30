@@ -4,6 +4,7 @@ import io.ktor.client.*
 import io.ktor.client.engine.*
 import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 
@@ -20,8 +21,13 @@ object NetworkSecurityConfig {
             // Enforce HTTPS for all requests
             install(DefaultRequest) {
                 url {
-                    protocol = io.ktor.http.URLProtocol.HTTPS
+                    protocol = URLProtocol.HTTPS
                 }
+            }
+            
+            // User agent for identification
+            install(UserAgent) {
+                agent = "EunioHealthApp/1.0"
             }
             
             // Content negotiation with JSON
@@ -39,11 +45,6 @@ object NetworkSecurityConfig {
                 requestTimeoutMillis = 30_000
                 connectTimeoutMillis = 10_000
                 socketTimeoutMillis = 30_000
-            }
-            
-            // User agent for identification
-            install(UserAgent) {
-                agent = "EunioHealthApp/1.0"
             }
         }
     }

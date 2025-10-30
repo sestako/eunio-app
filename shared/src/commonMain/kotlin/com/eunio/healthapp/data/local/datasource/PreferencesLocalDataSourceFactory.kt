@@ -18,5 +18,8 @@ interface PreferencesLocalDataSourceFactory {
 
 /**
  * Expected platform-specific implementation of PreferencesLocalDataSourceFactory.
+ * In Kotlin 2.2, expect classes with interfaces require explicit member declarations.
  */
-expect class PlatformPreferencesLocalDataSourceFactory() : PreferencesLocalDataSourceFactory
+expect class PlatformPreferencesLocalDataSourceFactory() : PreferencesLocalDataSourceFactory {
+    override fun create(databaseManager: DatabaseManager): PreferencesLocalDataSource
+}

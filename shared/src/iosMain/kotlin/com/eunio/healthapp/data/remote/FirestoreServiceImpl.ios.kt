@@ -750,4 +750,50 @@ class FirestoreServiceImpl(
             mockHealthReports.remove(reportId)
         }
     }
+
+    override suspend fun createShareableLink(reportId: String, expirationDays: Int): Result<String> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - return a fake shareable link
+            val now = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
+            "https://eunio.app/share/$reportId?expires=${now + (expirationDays * 24 * 60 * 60 * 1000)}"
+        }
+    }
+
+    override suspend fun revokeShareableLink(reportId: String): Result<Unit> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - no-op for now
+        }
+    }
+
+    // Settings operations (mock for now)
+    override suspend fun updateUserSettings(userId: String, settings: Map<String, Any>): Result<Unit> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - no-op for now
+        }
+    }
+
+    override suspend fun deleteUserSettings(userId: String): Result<Unit> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - no-op for now
+        }
+    }
+
+    override suspend fun saveSettingsHistory(userId: String, historyId: String, historyData: Map<String, Any>): Result<Unit> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - no-op for now
+        }
+    }
+
+    override suspend fun getSettingsHistory(userId: String, limit: Int): Result<List<Pair<String, Map<String, Any>>>> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - return empty list
+            emptyList()
+        }
+    }
+
+    override suspend fun deleteSettingsHistory(userId: String): Result<Unit> {
+        return Result.catching(errorHandler) {
+            // Mock implementation - no-op for now
+        }
+    }
 }

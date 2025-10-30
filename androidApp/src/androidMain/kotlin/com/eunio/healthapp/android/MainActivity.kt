@@ -10,6 +10,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.eunio.healthapp.android.ui.onboarding.OnboardingFlow
+import com.eunio.healthapp.android.ui.splash.SplashScreen
 import com.eunio.healthapp.android.ui.theme.EunioTheme
 
 class MainActivity : ComponentActivity() {
@@ -30,13 +31,25 @@ class MainActivity : ComponentActivity() {
         Log.e(TAG, "ERROR: This is a test error (not a real error)")
         Log.v(TAG, "========================================")
         Log.d(TAG, "Setting up UI content...")
+        
         setContent {
             EunioTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    OnboardingFlow()
+                    var showSplash by remember { mutableStateOf(true) }
+                    
+                    if (showSplash) {
+                        SplashScreen(
+                            onInitComplete = {
+                                Log.d(TAG, "Splash screen initialization complete")
+                                showSplash = false
+                            }
+                        )
+                    } else {
+                        OnboardingFlow()
+                    }
                 }
             }
         }

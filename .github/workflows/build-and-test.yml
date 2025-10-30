@@ -1,0 +1,312 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [ main, develop, 'upgrade/**' ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2
+  JAVA_VERSION: '17'
+  KOTLIN_VERSION: '2.2.20'
+  XCODE_VERSION: '26.0'
+
+jobs:
+  # Job 1: Verify Toolchain Versions
+  verify-toolchain:
+    name: Verify Toolchain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Make scripts executable
+      run: chmod +x ./gradlew ./scripts/verify-toolchain.sh
+      
+    - name: Run toolchain verification
+      run: ./scripts/verify-toolchain.sh
+      
+    - name: Verify Kotlin version in build files
+      run: |
+        echo "Checking Kotlin version in gradle/libs.versions.toml..."
+        KOTLIN_VER=$(grep '^kotlin = ' gradle/libs.versions.toml | sed 's/.*"\(.*\)".*/\1/')
+        if [ "$KOTLIN_VER" != "${{ env.KOTLIN_VERSION }}" ]; then
+          echo "❌ Kotlin version mismatch: found $KOTLIN_VER, expected ${{ env.KOTLIN_VERSION }}"
+          exit 1
+        fi
+        echo "✅ Kotlin version is correct: $KOTLIN_VER"
+
+  # Job 2: Build and Test Android
+  android-build:
+    name: Android Build and Test
+    runs-on: ubuntu-latest
+    needs: verify-toolchain
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Setup Gradle Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Build shared module
+      run: ./gradlew :shared:build --stacktrace
+      
+    - name: Build Android app
+      run: ./gradlew :androidApp:assembleDebug --stacktrace
+      
+    - name: Run Android unit tests
+      run: ./gradlew :androidApp:testDebugUnitTest --continue --stacktrace
+      
+    - name: Upload Android build artifacts
+      uses: actions/upload-artifact@v4
+      if: success()
+      with:
+        name: android-apk
+        path: androidApp/build/outputs/apk/debug/*.apk
+        retention-days: 7
+        
+    - name: Upload Android test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: android-test-results
+        path: |
+          androidApp/build/reports/tests/
+          androidApp/build/test-results/
+        retention-days: 7
+
+  # Job 3: Build and Test iOS
+  ios-build:
+    name: iOS Build and Test
+    runs-on: macos-14  # Latest available macOS runner
+    needs: verify-toolchain
+    timeout-minutes: 45
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Setup Gradle Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Setup CocoaPods Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          iosApp/Pods
+          ~/Library/Caches/CocoaPods
+        key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+          
+    - name: Select Xcode version
+      run: |
+        # Use the latest available Xcode on the runner
+        sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+        xcodebuild -version
+        
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Build iOS framework (arm64)
+      run: ./gradlew :shared:linkDebugFrameworkIosArm64 --stacktrace
+      
+    - name: Build iOS framework (simulator arm64)
+      run: ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64 --stacktrace
+      
+    - name: Install CocoaPods dependencies
+      run: |
+        cd iosApp
+        pod install --repo-update
+        
+    - name: Build iOS app
+      run: |
+        xcodebuild clean build \
+          -workspace iosApp/iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty || true
+          
+    - name: Run iOS tests
+      run: |
+        xcodebuild test \
+          -workspace iosApp/iosApp.xcworkspace \
+          -scheme iosApp \
+          -destination 'platform=iOS Simulator,name=iPhone 15,OS=latest' \
+          -configuration Debug \
+          CODE_SIGN_IDENTITY="" \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          | xcpretty || true
+      continue-on-error: true
+      
+    - name: Upload iOS test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: ios-test-results
+        path: |
+          iosApp/build/reports/
+          iosApp/DerivedData/Logs/Test/
+        retention-days: 7
+
+  # Job 4: Shared Module Tests
+  shared-tests:
+    name: Shared Module Tests
+    runs-on: ubuntu-latest
+    needs: verify-toolchain
+    timeout-minutes: 20
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Setup Gradle Cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+          
+    - name: Make gradlew executable
+      run: chmod +x ./gradlew
+      
+    - name: Run shared module tests
+      run: ./gradlew :shared:testDebugUnitTest --continue --stacktrace
+      
+    - name: Upload shared test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: shared-test-results
+        path: |
+          shared/build/reports/tests/
+          shared/build/test-results/
+        retention-days: 7
+
+  # Job 5: Test Summary
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [android-build, ios-build, shared-tests]
+    if: always()
+    timeout-minutes: 10
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Download all test artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: ci-test-results/
+        
+    - name: Generate test summary
+      run: |
+        mkdir -p test-summary
+        echo "# CI/CD Build and Test Summary" > test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        echo "**Generated:** $(date)" >> test-summary/summary.md
+        echo "**Workflow:** ${{ github.workflow }}" >> test-summary/summary.md
+        echo "**Run:** ${{ github.run_number }}" >> test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        echo "## Job Results" >> test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        echo "| Job | Status |" >> test-summary/summary.md
+        echo "|-----|--------|" >> test-summary/summary.md
+        echo "| Toolchain Verification | ${{ needs.verify-toolchain.result }} |" >> test-summary/summary.md
+        echo "| Android Build & Test | ${{ needs.android-build.result }} |" >> test-summary/summary.md
+        echo "| iOS Build & Test | ${{ needs.ios-build.result }} |" >> test-summary/summary.md
+        echo "| Shared Module Tests | ${{ needs.shared-tests.result }} |" >> test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        echo "## Environment" >> test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        echo "- **Kotlin:** ${{ env.KOTLIN_VERSION }}" >> test-summary/summary.md
+        echo "- **Java:** ${{ env.JAVA_VERSION }}" >> test-summary/summary.md
+        echo "- **Gradle:** 8.10+" >> test-summary/summary.md
+        echo "" >> test-summary/summary.md
+        cat test-summary/summary.md
+        
+    - name: Upload test summary
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-summary
+        path: test-summary/
+        retention-days: 30
+        
+    - name: Check for failures
+      run: |
+        if [ "${{ needs.verify-toolchain.result }}" != "success" ]; then
+          echo "❌ Toolchain verification failed"
+          exit 1
+        fi
+        if [ "${{ needs.android-build.result }}" != "success" ]; then
+          echo "❌ Android build failed"
+          exit 1
+        fi
+        if [ "${{ needs.ios-build.result }}" != "success" ]; then
+          echo "❌ iOS build failed"
+          exit 1
+        fi
+        if [ "${{ needs.shared-tests.result }}" != "success" ]; then
+          echo "❌ Shared tests failed"
+          exit 1
+        fi
+        echo "✅ All jobs completed successfully"

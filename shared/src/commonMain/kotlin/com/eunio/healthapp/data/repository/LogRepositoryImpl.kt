@@ -8,6 +8,7 @@ import com.eunio.healthapp.domain.model.DailyLog
 import com.eunio.healthapp.domain.model.Symptom
 import com.eunio.healthapp.domain.repository.LogRepository
 import com.eunio.healthapp.domain.util.ErrorHandler
+import com.eunio.healthapp.domain.util.NetworkConnectivity
 import com.eunio.healthapp.domain.util.Result
 import com.eunio.healthapp.domain.util.StructuredLogger
 import com.eunio.healthapp.domain.util.platformLogDebug
@@ -23,11 +24,15 @@ import kotlinx.datetime.todayIn
 class LogRepositoryImpl(
     private val firestoreService: FirestoreService,
     private val dailyLogDao: DailyLogDao,
-    private val errorHandler: ErrorHandler
+    private val errorHandler: ErrorHandler,
+    private val networkConnectivity: NetworkConnectivity? = null
 ) : LogRepository {
 
     override suspend fun saveDailyLog(log: DailyLog): Result<Unit> {
         val startTime = Clock.System.now()
+        
+        // Platform-specific debug logging
+        platformLogDebug("LogRepository", "💾 saveDailyLog() called - userId: ${log.userId}, logId: ${log.id}, date: ${log.date}")
         
         return try {
             // Log operation start with structured logging
@@ -60,40 +65,81 @@ class LogRepositoryImpl(
             // 2. Mark as pending sync (will be synced in background)
             dailyLogDao.updateSyncStatus(updatedLog.id, "PENDING")
             
-            // 3. Attempt Firebase sync in background
-            val remoteResult = firestoreService.saveDailyLog(updatedLog)
-            val latencyMs = (Clock.System.now() - startTime).inWholeMilliseconds
+            // 3. Attempt Firebase sync ONLY if online, with timeout
+            val isOnline = try {
+                networkConnectivity?.isConnected() ?: false
+            } catch (e: Exception) {
+                platformLogDebug("LogRepository", "⚠️ Failed to check network connectivity: ${e.message}")
+                false
+            }
             
-            if (remoteResult.isSuccess) {
-                // 4a. Mark as synced on success
-                dailyLogDao.markAsSynced(updatedLog.id)
+            if (isOnline) {
+                platformLogDebug("LogRepository", "🌐 Device is online - attempting Firebase sync with timeout")
+                
+                // Add timeout to prevent hanging (5 seconds)
+                val remoteResult = try {
+                    kotlinx.coroutines.withTimeout(5000) {
+                        firestoreService.saveDailyLog(updatedLog)
+                    }
+                } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                    platformLogDebug("LogRepository", "⏱️ Firebase sync timed out after 5 seconds")
+                    null
+                } catch (e: Exception) {
+                    platformLogDebug("LogRepository", "❌ Firebase sync failed: ${e.message}")
+                    null
+                }
+                
+                val latencyMs = (Clock.System.now() - startTime).inWholeMilliseconds
+                
+                if (remoteResult?.isSuccess == true) {
+                    // Mark as synced on success
+                    dailyLogDao.markAsSynced(updatedLog.id)
+                    platformLogDebug("LogRepository", "✅ Firebase sync successful - latency: ${latencyMs}ms")
+                    
+                    StructuredLogger.logStructured(
+                        tag = "DailyLogSync",
+                        operation = StructuredLogger.LogOperation.FIRESTORE_WRITE,
+                        data = mapOf(
+                            "path" to FirestorePaths.dailyLogDoc(log.userId, log.id),
+                            "status" to "SUCCESS",
+                            "latencyMs" to latencyMs
+                        )
+                    )
+                } else {
+                    // Keep pending on failure or timeout (will be retried later)
+                    platformLogDebug("LogRepository", "⚠️ Firebase sync failed or timed out - will retry later")
+                    
+                    StructuredLogger.logStructured(
+                        tag = "DailyLogSync",
+                        operation = StructuredLogger.LogOperation.FIRESTORE_WRITE,
+                        data = mapOf(
+                            "path" to FirestorePaths.dailyLogDoc(log.userId, log.id),
+                            "status" to "FAILED_OR_TIMEOUT",
+                            "latencyMs" to latencyMs,
+                            "error" to (remoteResult?.errorOrNull()?.message ?: "Timeout or network error")
+                        )
+                    )
+                }
+            } else {
+                platformLogDebug("LogRepository", "📴 Device is offline - skipping Firebase sync, data saved locally")
                 
                 StructuredLogger.logStructured(
                     tag = "DailyLogSync",
                     operation = StructuredLogger.LogOperation.FIRESTORE_WRITE,
                     data = mapOf(
                         "path" to FirestorePaths.dailyLogDoc(log.userId, log.id),
-                        "status" to "SUCCESS",
-                        "latencyMs" to latencyMs
+                        "status" to "SKIPPED_OFFLINE",
+                        "latencyMs" to (Clock.System.now() - startTime).inWholeMilliseconds
                     )
                 )
-            } else {
-                // 4b. Keep pending on failure (will be retried later)
-                StructuredLogger.logStructured(
-                    tag = "DailyLogSync",
-                    operation = StructuredLogger.LogOperation.FIRESTORE_WRITE,
-                    data = mapOf(
-                        "path" to FirestorePaths.dailyLogDoc(log.userId, log.id),
-                        "status" to "FAILED",
-                        "latencyMs" to latencyMs,
-                        "error" to (remoteResult.errorOrNull()?.message ?: "Unknown error")
-                    )
-                )
-                // Don't fail the operation - local save succeeded
             }
             
+            // Always return success if local save succeeded
+            platformLogDebug("LogRepository", "✅ Local save successful - returning success")
             Result.success(Unit)
+            
         } catch (e: Exception) {
+            platformLogDebug("LogRepository", "❌ Save failed: ${e.message}")
             StructuredLogger.logStructured(
                 tag = "DailyLogSync",
                 operation = StructuredLogger.LogOperation.SAVE_ERROR,

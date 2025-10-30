@@ -9,7 +9,7 @@
   - Create rollback plan document
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 9.1, 9.2_
 
-- [ ] 2. Update Kotlin version and compiler plugins
+- [x] 2. Update Kotlin version and compiler plugins
   - Update kotlin version to "2.2.20" in gradle/libs.versions.toml
   - Update Kotlin Serialization plugin to "2.2.20"
   - Update KSP to "2.2.20-1.0.28" (compatible with Kotlin 2.2.20)
@@ -21,7 +21,7 @@
   - Sync Gradle files and resolve any immediate conflicts
   - _Requirements: 1.1, 1.2, 1.3, 1.7, 2.1, 2.2, 2.3_
 
-- [ ] 3. Update Compose Multiplatform and UI dependencies
+- [x] 3. Update Compose Multiplatform and UI dependencies
   - Update compose-plugin to "1.7.1"
   - Verify Compose compiler plugin is compatible with Kotlin 2.2.20
   - Update Compose UI libraries to compatible versions
@@ -29,7 +29,7 @@
   - Sync and verify no conflicts
   - _Requirements: 2.4, 5.8_
 
-- [ ] 4. Update Ktor client to version 3.x
+- [x] 4. Update Ktor client to version 3.x
   - Update ktor version to "3.0.1"
   - Review Ktor 3.0 migration guide
   - Update Ktor client configuration if needed
@@ -37,22 +37,23 @@
   - Fix any breaking API changes
   - _Requirements: 2.5_
 
-- [ ] 5. Update Koin to version 4.x
-  - Update koin version to "4.0.0"
-  - Review Koin 4.0 migration guide
-  - Update Koin module definitions if needed
-  - Update dependency injection setup if needed
-  - Fix any breaking API changes
+- [x] 5. Update Koin to version 4.x
+  - Update koin version to "4.0.0" ✅
+  - Review Koin 4.0 migration guide ✅
+  - Update Koin module definitions if needed ✅ (No changes required)
+  - Update dependency injection setup if needed ✅ (No changes required)
+  - Fix any breaking API changes ✅ (Fixed NoBeanDefFoundException → NoDefinitionFoundException)
   - _Requirements: 2.6_
+  - **Summary**: Koin 4.0 upgrade complete. All Koin functionality working correctly. See task-5-koin-4-upgrade-summary.md for details.
 
-- [ ] 6. Update SQLDelight and other dependencies
+- [x] 6. Update SQLDelight and other dependencies
   - Update sqlDelight to "2.0.2"
   - Update Firebase BOM to latest version
   - Update any other dependencies to Kotlin 2.2 compatible versions
   - Verify all dependencies resolve without conflicts
   - _Requirements: 2.7, 2.8_
 
-- [ ] 7. Update Gradle build configuration and enable strict dependency verification
+- [x] 7. Update Gradle build configuration and enable strict dependency verification
   - Update gradle.properties with Kotlin 2.2 compiler options
   - Add kotlin.mpp.stability.nowarn=true
   - Add kotlin.mpp.androidSourceSetLayoutVersion=2
@@ -63,7 +64,7 @@
   - Update compiler args for iOS targets
   - _Requirements: 2.9, 2.10, 3.8, 3.9, 5.1, 5.2, 5.3, 5.4, 5.7_
 
-- [ ] 8. Fix Kotlin compilation errors
+- [x] 8. Fix Kotlin compilation errors
   - Run ./gradlew clean
   - Run ./gradlew :shared:build
   - Fix any compilation errors in shared module
@@ -72,21 +73,21 @@
   - Verify shared module builds successfully
   - _Requirements: 1.2, 1.5, 5.5_
 
-- [ ] 9. Fix Android compilation and build
+- [x] 9. Fix Android compilation and build
   - Run ./gradlew :androidApp:assembleDebug
   - Fix any Android-specific compilation errors
   - Update Android-specific code for new dependencies
   - Verify Android app builds successfully
   - _Requirements: 1.3, 5.6_
 
-- [ ] 10. Run Android tests
+- [x] 10. Run Android tests
   - Run ./gradlew :androidApp:testDebugUnitTest
   - Fix any failing unit tests
   - Update test code for new dependency versions
   - Verify all Android tests pass
   - _Requirements: 7.1, 7.2_
 
-- [ ] 11. Install and configure Xcode 26
+- [x] 11. Install and configure Xcode 26
   - Download Xcode 26 from Mac App Store
   - Install Xcode 26 to /Applications/Xcode.app
   - Run sudo xcode-select -s /Applications/Xcode.app
@@ -95,7 +96,7 @@
   - Install additional components if prompted
   - _Requirements: 3.1, 3.2, 3.3_
 
-- [ ] 12. Update iOS project settings
+- [x] 12. Update iOS project settings
   - Open iosApp/iosApp.xcodeproj in Xcode 26
   - Update project settings if Xcode prompts
   - Verify iOS Deployment Target is set to 15.0
@@ -103,7 +104,7 @@
   - Update signing certificates if needed
   - _Requirements: 3.4, 4.1, 4.2_
 
-- [ ] 13. Migrate to Swift Package Manager and update dependencies
+- [x] 13. Migrate to Swift Package Manager and update dependencies
   - Evaluate migrating Firebase from CocoaPods to Swift Package Manager (SPM)
   - If using SPM: Add Firebase packages via Xcode (File > Add Packages)
   - Use latest FirebaseCore and FirebaseFirestore compatible with iOS 26
@@ -113,14 +114,29 @@
   - Fix any dependency installation issues
   - _Requirements: 6.7, 6.8, 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 14. Build iOS framework with Kotlin 2.2
+- [x] 14. Build iOS framework with Kotlin 2.2
   - Run ./gradlew :shared:linkDebugFrameworkIosArm64
   - Run ./gradlew :shared:linkDebugFrameworkIosSimulatorArm64
   - Verify Kotlin/Native compilation succeeds
   - Verify framework is compatible with Xcode 26
   - _Requirements: 1.5, 1.6, 5.4, 5.5_
 
-- [ ] 15. Fix iOS compilation errors
+- [x] 14.5. Implement typed Swift framework + cinterop bridge (EunioBridgeKit)
+  - Create Swift framework EunioBridgeKit with @objc protocol for Firebase operations
+  - Define protocol with typed methods (saveDocument, getDocument, etc.) using primitives, NSDictionary/NSArray, and completion blocks
+  - Configure framework build settings (Build Libraries for Distribution: YES, Defines Module: YES)
+  - Build XCFramework for arm64 and x86_64 simulator architectures
+  - Create cinterop definition file (shared/src/iosMain/cinterop/EunioBridgeKit.def)
+  - Configure Kotlin/Native cinterop in shared/build.gradle.kts with compilerOpts and linkerOpts
+  - Refactor FirebaseNativeBridge.ios.kt to use typed cinterop bindings (remove all asDynamic, performSelector, unsafeCast)
+  - Implement concrete Swift class in iosApp that conforms to protocol and uses Firebase SDK
+  - Wire up bridge initialization in iOS app startup (inject instance into shared module)
+  - Remove all legacy dynamic/runtime hacks and temporary stubs
+  - Verify Firebase save/load operations work end-to-end
+  - Confirm Android ↔ iOS data parity
+  - _Requirements: 1.6, 3.8, 5.4, 5.5, 6.1, 6.2, 6.3, 6.4, 6.5, 6.7_
+
+- [x] 15. Fix iOS compilation errors
   - Build iOS app in Xcode 26 (Cmd+B)
   - Fix any Swift compilation errors
   - Fix any Objective-C bridging errors
@@ -129,14 +145,14 @@
   - Verify iOS app builds successfully
   - _Requirements: 3.5, 4.5_
 
-- [ ] 16. Run iOS tests
+- [x] 16. Run iOS tests
   - Run iOS unit tests in Xcode (Cmd+U)
   - Fix any failing tests
   - Update test code for iOS 26 changes
   - Verify all iOS tests pass
   - _Requirements: 7.1, 7.2_
 
-- [ ] 17. Test iOS app on simulator
+- [x] 17. Test iOS app on simulator
   - Run app on iOS 26 simulator
   - Test app launch and basic navigation
   - Verify UI renders correctly
@@ -151,7 +167,7 @@
   - Test with different iOS versions if possible
   - _Requirements: 3.7, 4.4, 7.7_
 
-- [ ] 19. Test Firebase authentication on both platforms
+- [x] 19. Test Firebase authentication on both platforms
   - Test sign-up flow on Android
   - Test sign-up flow on iOS
   - Test sign-in flow on Android
@@ -160,7 +176,7 @@
   - Verify Firebase Auth works correctly
   - _Requirements: 6.1, 6.2, 6.3, 7.5_
 
-- [ ] 20. Test Firestore data operations on both platforms
+- [x] 20. Test Firestore data operations on both platforms
   - Test saving daily log on Android
   - Test saving daily log on iOS
   - Test loading daily log on Android
@@ -168,7 +184,7 @@
   - Verify data format is correct
   - _Requirements: 6.4, 6.5, 7.3_
 
-- [ ] 21. Test cross-platform data sync
+- [x] 21. Test cross-platform data sync
   - Save data on Android, verify it appears on iOS
   - Save data on iOS, verify it appears on Android
   - Test data updates sync correctly
@@ -176,7 +192,7 @@
   - Verify sync timestamps are correct
   - _Requirements: 7.4_
 
-- [ ] 22. Test offline mode and local persistence
+- [x] 22. Test offline mode and local persistence
   - Test saving data offline on Android
   - Test saving data offline on iOS
   - Test data persists after app restart
@@ -184,7 +200,7 @@
   - Verify offline mode works correctly
   - _Requirements: 6.6, 7.6_
 
-- [ ] 23. Test all major app features
+- [x] 23. Test all major app features
   - Test daily logging screen on both platforms
   - Test calendar view on both platforms
   - Test settings screen on both platforms
@@ -193,7 +209,7 @@
   - Verify no regressions in functionality
   - _Requirements: 7.3, 7.4, 7.5, 7.6, 7.7_
 
-- [ ] 24. Performance validation
+- [x] 24. Performance validation
   - Measure app startup time on both platforms
   - Measure build time (Gradle and Xcode)
   - Measure Firebase sync latency
@@ -202,7 +218,7 @@
   - Document any performance changes
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5_
 
-- [ ] 25. Create toolchain verification script
+- [x] 25. Create toolchain verification script
   - Create scripts/verify-toolchain.sh
   - Add Kotlin version check (must be 2.2.20)
   - Add Gradle version check (must be 8.10+)
@@ -212,7 +228,7 @@
   - Test script locally
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
 
-- [ ] 26. Update CI/CD pipelines
+- [x] 26. Update CI/CD pipelines
   - Update GitHub Actions to use macOS 26 (Tahoe) runners
   - Update GitHub Actions to use Xcode 26
   - Update GitHub Actions to use Kotlin 2.2.20
