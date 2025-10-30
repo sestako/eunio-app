@@ -21,12 +21,36 @@ on:
 env:
   GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.workers.max=2
   JAVA_VERSION: '17'
+  KOTLIN_VERSION: '2.2.20'
 
 jobs:
+  # Job 0: Verify Toolchain
+  verify-toolchain:
+    name: Verify Toolchain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        java-version: ${{ env.JAVA_VERSION }}
+        distribution: 'temurin'
+        
+    - name: Make scripts executable
+      run: chmod +x ./gradlew ./scripts/verify-toolchain.sh
+      
+    - name: Run toolchain verification
+      run: ./scripts/verify-toolchain.sh
+
   # Job 1: Common/Shared Module Tests
   shared-tests:
     name: Shared Module Tests
     runs-on: ubuntu-latest
+    needs: verify-toolchain
     timeout-minutes: 30
     
     steps:
@@ -45,7 +69,8 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
           
@@ -69,6 +94,7 @@ jobs:
   android-tests:
     name: Android Tests
     runs-on: ubuntu-latest
+    needs: verify-toolchain
     timeout-minutes: 30
     
     steps:
@@ -87,7 +113,8 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
           
@@ -111,7 +138,7 @@ jobs:
   cross-platform-validation:
     name: Cross-Platform Consistency
     runs-on: ubuntu-latest
-    needs: [shared-tests, android-tests]
+    needs: [verify-toolchain, shared-tests, android-tests]
     timeout-minutes: 20
     
     steps:
@@ -130,7 +157,8 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
           
@@ -157,7 +185,7 @@ jobs:
   test-suite-health:
     name: Test Suite Health Check
     runs-on: ubuntu-latest
-    needs: [shared-tests, android-tests, cross-platform-validation]
+    needs: [verify-toolchain, shared-tests, android-tests, cross-platform-validation]
     if: always()
     timeout-minutes: 15
     
@@ -177,7 +205,8 @@ jobs:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          ~/.gradle/kotlin
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', 'gradle/libs.versions.toml') }}
         restore-keys: |
           ${{ runner.os }}-gradle-
           
@@ -204,9 +233,15 @@ jobs:
         echo "" >> test-results/ci-summary/ci-report.md
         echo "## Job Results" >> test-results/ci-summary/ci-report.md
         echo "" >> test-results/ci-summary/ci-report.md
+        echo "- **Toolchain Verification:** ${{ needs.verify-toolchain.result }}" >> test-results/ci-summary/ci-report.md
         echo "- **Shared Tests:** ${{ needs.shared-tests.result }}" >> test-results/ci-summary/ci-report.md
         echo "- **Android Tests:** ${{ needs.android-tests.result }}" >> test-results/ci-summary/ci-report.md
         echo "- **Cross-Platform Validation:** ${{ needs.cross-platform-validation.result }}" >> test-results/ci-summary/ci-report.md
+        echo "" >> test-results/ci-summary/ci-report.md
+        echo "## Environment" >> test-results/ci-summary/ci-report.md
+        echo "" >> test-results/ci-summary/ci-report.md
+        echo "- **Kotlin:** ${{ env.KOTLIN_VERSION }}" >> test-results/ci-summary/ci-report.md
+        echo "- **Java:** ${{ env.JAVA_VERSION }}" >> test-results/ci-summary/ci-report.md
         echo "" >> test-results/ci-summary/ci-report.md
         
     - name: Upload comprehensive test report
